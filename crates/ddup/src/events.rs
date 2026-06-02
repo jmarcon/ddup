@@ -1,12 +1,15 @@
 //! Keyboard event handling.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{AppState, Modal, ViewMode};
 
 /// Handles one key event.
 pub fn handle_key(app: &mut AppState, key: KeyEvent) {
     match key.code {
+        KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.should_quit = true;
+        }
         KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
         KeyCode::Char('j') | KeyCode::Down => app.tree.move_cursor(1),
         KeyCode::Char('k') | KeyCode::Up => app.tree.move_cursor(-1),
