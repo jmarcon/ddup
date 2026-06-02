@@ -25,6 +25,15 @@ pub enum ScanStep {
     Persist,
 }
 
+/// Step progress.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct StepProgress {
+    /// Current amount.
+    pub current: usize,
+    /// Total amount if known.
+    pub total: Option<usize>,
+}
+
 /// CLI arguments.
 #[derive(Clone, Debug, Parser)]
 pub struct Args {
@@ -129,10 +138,8 @@ pub struct AppState {
     pub tree: TreeModel,
     /// Whether a scan is running.
     pub scan_running: bool,
-    /// Current scan step count.
-    pub scan_current: usize,
-    /// Estimated scan total.
-    pub scan_total: Option<usize>,
+    /// Current step progress.
+    pub step_progress: StepProgress,
     /// Scan phase label.
     pub scan_phase: String,
     /// Current scan step.
@@ -169,8 +176,10 @@ impl AppState {
             should_quit: false,
             tree: build_tree(ViewMode::DirsDuplicated, &[], &[], sort),
             scan_running: false,
-            scan_current: 0,
-            scan_total: None,
+            step_progress: StepProgress {
+                current: 0,
+                total: None,
+            },
             scan_phase: "Idle".to_owned(),
             scan_step: ScanStep::Discover,
             scan_done_steps: Vec::new(),
@@ -193,8 +202,10 @@ impl AppState {
     /// Marks scan as started.
     pub fn begin_scan(&mut self) {
         self.scan_running = true;
-        self.scan_current = 0;
-        self.scan_total = None;
+        self.step_progress = StepProgress {
+            current: 0,
+            total: None,
+        };
         self.scan_step = ScanStep::Discover;
         self.scan_done_steps.clear();
         self.spinner_index = 0;
@@ -216,30 +227,45 @@ impl AppState {
             } => {
                 self.finish_step(ScanStep::Discover);
                 self.scan_step = ScanStep::Hash;
-                self.scan_total = Some(total_dirs_estimate);
+                self.step_progress = StepProgress {
+                    current: 0,
+                    total: Some(total_dirs_estimate),
+                };
                 "Hashing files and directories".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("{total_dirs_estimate} directories discovered");
             }
             ScanEvent::DirHashed { path, current } => {
-                self.scan_current = current;
+                self.step_progress.current = current;
                 "Hashing files and directories".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("Current directory: {}", path.display());
             }
             ScanEvent::FileDupsComputed { count } => {
                 self.finish_step(ScanStep::DirGroups);
                 self.scan_step = ScanStep::FileGroups;
+                self.step_progress = StepProgress {
+                    current: 0,
+                    total: None,
+                };
                 "Computing duplicate file groups".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("{count} duplicate file groups found");
             }
             ScanEvent::DirDupsComputed { count } => {
                 self.finish_step(ScanStep::Hash);
                 self.scan_step = ScanStep::DirGroups;
+                self.step_progress = StepProgress {
+                    current: 0,
+                    total: None,
+                };
                 "Computing duplicate directory groups".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("{count} duplicate directory groups found");
             }
             ScanEvent::PersistStarted => {
                 self.finish_step(ScanStep::TreeStats);
                 self.scan_step = ScanStep::Persist;
+                self.step_progress = StepProgress {
+                    current: 0,
+                    total: None,
+                };
                 "Persisting results".clone_into(&mut self.scan_phase);
                 "Writing scan, groups, file entries, and tree nodes to SQLite"
                     .clone_into(&mut self.scan_detail);
@@ -247,14 +273,20 @@ impl AppState {
             ScanEvent::TreeStatsBuilt => {
                 self.finish_step(ScanStep::FileGroups);
                 self.scan_step = ScanStep::TreeStats;
+                self.step_progress = StepProgress {
+                    current: 0,
+                    total: None,
+                };
                 "Building tree statistics".clone_into(&mut self.scan_phase);
                 "Preparing treemap/sunburst data".clone_into(&mut self.scan_detail);
             }
             ScanEvent::Finished { summary } => {
                 self.finish_step(ScanStep::TreeStats);
                 self.scan_step = ScanStep::Persist;
-                self.scan_current = summary.total_dirs.try_into().unwrap_or(usize::MAX);
-                self.scan_total = Some(self.scan_current);
+                self.step_progress = StepProgress {
+                    current: 0,
+                    total: None,
+                };
                 "Persisting results".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!(
                     "{} dirs, {} files, {} wasted bytes",

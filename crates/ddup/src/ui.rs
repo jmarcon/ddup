@@ -121,17 +121,23 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
             Constraint::Length(1),
         ])
         .split(area);
-    let percent = app.scan_total.map_or(0, |total| {
+    let percent = app.step_progress.total.map_or(0, |total| {
         let value = app
-            .scan_current
+            .step_progress
+            .current
             .saturating_mul(100)
             .checked_div(total)
             .unwrap_or(0);
         u16::try_from(value.min(100)).unwrap_or(100)
     });
-    let label = app.scan_total.map_or_else(
-        || "Discovery phase".to_owned(),
-        |total| format!("{percent}% - {} / {} directories", app.scan_current, total),
+    let label = app.step_progress.total.map_or_else(
+        || format!("{} {}", spinner(app), app.scan_phase),
+        |total| {
+            format!(
+                "{percent}% - {} / {} directories",
+                app.step_progress.current, total
+            )
+        },
     );
 
     f.render_widget(Clear, area);
@@ -184,11 +190,15 @@ fn step_marker(app: &AppState, step: ScanStep) -> String {
     if app.scan_done_steps.contains(&step) {
         "[x]".to_owned()
     } else if app.scan_step == step {
-        let frames = ['/', '-', '\\', '|'];
-        format!("[{}]", frames[app.spinner_index % frames.len()])
+        format!("[{}]", spinner(app))
     } else {
         "[ ]".to_owned()
     }
+}
+
+fn spinner(app: &AppState) -> char {
+    let frames = ['/', '-', '\\', '|'];
+    frames[app.spinner_index % frames.len()]
 }
 
 fn shorten(value: &str, max_chars: usize) -> String {
