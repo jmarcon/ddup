@@ -36,6 +36,12 @@ pub struct TreeNode {
     pub group_id: Option<i64>,
     /// Duplicate marker.
     pub dup_marker: String,
+    /// Group entry count.
+    pub entry_count: usize,
+    /// Duplicate group size.
+    pub size_bytes: u64,
+    /// Recursive file count.
+    pub file_count: Option<u64>,
 }
 
 /// Tree model.
@@ -110,8 +116,14 @@ pub fn build_tree(
                         children: Vec::new(),
                         group_id: group.id,
                         dup_marker: entry.status.to_string(),
+                        entry_count: group.entries.len(),
+                        size_bytes: group.size_bytes,
+                        file_count: Some(group.file_count),
                     })
                     .collect(),
+                entry_count: group.entries.len(),
+                size_bytes: group.size_bytes,
+                file_count: Some(group.file_count),
             })
             .collect(),
         ViewMode::FilesDuplicatedSmart | ViewMode::FilesDuplicatedFlat => file_groups
@@ -134,8 +146,14 @@ pub fn build_tree(
                         children: Vec::new(),
                         group_id: group.id,
                         dup_marker: entry.status.to_string(),
+                        entry_count: group.entries.len(),
+                        size_bytes: group.size_bytes,
+                        file_count: None,
                     })
                     .collect(),
+                entry_count: group.entries.len(),
+                size_bytes: group.size_bytes,
+                file_count: None,
             })
             .collect(),
     };
@@ -187,9 +205,15 @@ mod tests {
                     children: Vec::new(),
                     group_id: Some(1),
                     dup_marker: "pending".to_owned(),
+                    entry_count: 2,
+                    size_bytes: 100,
+                    file_count: Some(3),
                 }],
                 group_id: Some(1),
                 dup_marker: "dir".to_owned(),
+                entry_count: 2,
+                size_bytes: 100,
+                file_count: Some(3),
             }],
         }
     }

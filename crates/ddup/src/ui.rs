@@ -12,6 +12,7 @@ use ratatui::{
 use crate::{
     app::{AppState, Modal, ScanStep},
     modal::modal_text,
+    tree::{NodeKind, TreeNode},
 };
 
 /// Renders the application.
@@ -56,10 +57,10 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         })
         .collect::<Vec<_>>();
     f.render_widget(List::new(items).block(panel("Duplicates")), body[0]);
-    let details = app.tree.selected().map_or_else(
-        || "No selection".to_owned(),
-        |node| node.path.display().to_string(),
-    );
+    let details = app
+        .tree
+        .selected()
+        .map_or_else(|| "No selection".to_owned(), selected_details);
     f.render_widget(
         Paragraph::new(details)
             .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
@@ -113,6 +114,60 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
                 .block(panel("Modal")),
             area,
         );
+    }
+}
+
+fn selected_details(node: &TreeNode) -> String {
+    let group = node
+        .group_id
+        .map_or_else(|| "none".to_owned(), |value| value.to_string());
+    let kind = match node.kind {
+        NodeKind::GroupRoot if node.file_count.is_some() => "duplicate directory group",
+        NodeKind::GroupRoot => "duplicate file group",
+        NodeKind::DirEntry => "duplicate directory",
+        NodeKind::FileEntry | NodeKind::FileLeaf => "duplicate file",
+    };
+    let file_count = node
+        .file_count
+        .map_or_else(|| "n/a".to_owned(), |value| value.to_string());
+    let path = if node.path.as_os_str().is_empty() {
+        node.label.clone()
+    } else {
+        node.path.display().to_string()
+    };
+
+    [
+        format!("Type: {kind}"),
+        format!("Group: {group}"),
+        format!("Status: {}", node.dup_marker),
+        format!("Entries: {}", node.entry_count),
+        format!("Size: {}", format_bytes(node.size_bytes)),
+        format!("Files: {file_count}"),
+        format!("Path: {path}"),
+    ]
+    .join("\n")
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut divisor = 1_u64;
+    let mut unit_index = 0;
+    while unit_index + 1 < UNITS.len() {
+        let Some(next_divisor) = divisor.checked_mul(1024) else {
+            break;
+        };
+        if bytes < next_divisor {
+            break;
+        }
+        divisor = next_divisor;
+        unit_index += 1;
+    }
+    if unit_index == 0 {
+        format!("{} {}", bytes, UNITS[unit_index])
+    } else {
+        let whole = bytes / divisor;
+        let fraction = bytes % divisor * 100 / divisor;
+        format!("{whole}.{fraction:02} {} ({bytes} B)", UNITS[unit_index])
     }
 }
 
