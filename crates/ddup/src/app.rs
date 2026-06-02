@@ -226,11 +226,23 @@ impl AppState {
                 self.scan_detail = format!("Current directory: {}", path.display());
             }
             ScanEvent::FileDupsComputed { count } => {
-                self.finish_step(ScanStep::Hash);
                 self.finish_step(ScanStep::DirGroups);
                 self.scan_step = ScanStep::FileGroups;
                 "Computing duplicate file groups".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("{count} duplicate file groups found");
+            }
+            ScanEvent::DirDupsComputed { count } => {
+                self.finish_step(ScanStep::Hash);
+                self.scan_step = ScanStep::DirGroups;
+                "Computing duplicate directory groups".clone_into(&mut self.scan_phase);
+                self.scan_detail = format!("{count} duplicate directory groups found");
+            }
+            ScanEvent::PersistStarted => {
+                self.finish_step(ScanStep::TreeStats);
+                self.scan_step = ScanStep::Persist;
+                "Persisting results".clone_into(&mut self.scan_phase);
+                "Writing scan, groups, file entries, and tree nodes to SQLite"
+                    .clone_into(&mut self.scan_detail);
             }
             ScanEvent::TreeStatsBuilt => {
                 self.finish_step(ScanStep::FileGroups);

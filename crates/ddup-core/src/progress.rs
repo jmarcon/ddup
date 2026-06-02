@@ -29,6 +29,13 @@ pub enum ScanEvent {
         /// Duplicate group count.
         count: usize,
     },
+    /// Directory duplicate groups were computed.
+    DirDupsComputed {
+        /// Duplicate group count.
+        count: usize,
+    },
+    /// Result persistence started.
+    PersistStarted,
     /// Tree statistics were built.
     TreeStatsBuilt,
     /// Scan finished.

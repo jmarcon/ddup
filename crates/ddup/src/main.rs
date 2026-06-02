@@ -13,7 +13,7 @@ use std::{sync::mpsc, thread, time::Duration};
 use anyhow::Result;
 use clap::Parser;
 use crossterm::event::{self, Event};
-use ddup_core::{ScanMode, ScanResult, WalkConfig, scan};
+use ddup_core::{ScanEvent, ScanMode, ScanResult, WalkConfig, scan};
 
 use crate::app::{AppState, Args, ViewMode};
 
@@ -41,6 +41,7 @@ fn main() -> Result<()> {
         }
         app.tick_spinner();
         if let Ok(result) = result_rx.try_recv() {
+            app.apply_scan_event(ScanEvent::PersistStarted);
             handle_scan_result(&mut app, result);
         }
         if app.should_quit {

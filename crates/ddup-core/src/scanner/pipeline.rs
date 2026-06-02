@@ -116,6 +116,12 @@ pub fn scan(
     }
 
     let dir_groups = detect_dir_duplicates(&dir_hashes, &dir_metadata);
+    send_event(
+        progress.as_ref(),
+        ScanEvent::DirDupsComputed {
+            count: dir_groups.len(),
+        },
+    );
     let mut file_groups = detect_file_duplicates(&file_hashes, &file_sizes);
     if mode == ScanMode::Smart {
         apply_smart_suppression(&mut file_groups, &dir_groups);

@@ -3,7 +3,7 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
-    text::Line,
+    text::{Line, Span},
     widgets::Clear,
     widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
 };
@@ -145,9 +145,13 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
     ];
     let step_lines = steps
         .iter()
-        .map(|(step, label)| format!("{} {}", step_marker(app, *step), label))
-        .collect::<Vec<_>>()
-        .join("\n");
+        .map(|(step, label)| {
+            Line::from(vec![
+                Span::raw(step_marker(app, *step)),
+                Span::raw(format!(" {label}")),
+            ])
+        })
+        .collect::<Vec<_>>();
 
     f.render_widget(
         Paragraph::new(step_lines)
