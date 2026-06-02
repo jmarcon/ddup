@@ -116,6 +116,8 @@ pub enum Modal {
 pub struct AppState {
     /// Database.
     pub db: Db,
+    /// Database path.
+    pub db_path: PathBuf,
     /// Current scan.
     pub current_scan: Option<Scan>,
     /// Current view mode.
@@ -165,6 +167,7 @@ impl AppState {
         let sort = SortConfig::default();
         Ok(Self {
             db,
+            db_path,
             current_scan: None,
             view_mode: ViewMode::DirsDuplicated,
             dir_groups: Vec::new(),
