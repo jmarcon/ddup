@@ -63,4 +63,3 @@ impl fmt::Display for FileHash {
         f.write_str(&self.0)
     }
 }
-

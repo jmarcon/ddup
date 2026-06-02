@@ -2,7 +2,7 @@
 
 use std::{fs, path::Path};
 
-use ddup_core::{hash_dir, hash_file, CoreError, DirHash, FileHash};
+use ddup_core::{CoreError, DirHash, FileHash, hash_dir, hash_file};
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 
@@ -95,4 +95,3 @@ fn h9_child_dir_hashes_only_are_defined() {
 
     assert!(!hash.as_str().is_empty());
 }
-

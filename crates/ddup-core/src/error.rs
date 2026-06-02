@@ -29,4 +29,3 @@ pub enum CoreError {
 
 /// Core result type.
 pub type Result<T> = std::result::Result<T, CoreError>;
-

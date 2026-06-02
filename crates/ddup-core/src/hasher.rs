@@ -55,4 +55,3 @@ pub fn hash_dir(file_hashes: &[FileHash], child_dir_hashes: &[DirHash]) -> DirHa
     hasher.update(payload.as_bytes());
     DirHash::new(format!("{:x}", hasher.finalize()))
 }
-

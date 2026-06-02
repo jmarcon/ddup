@@ -44,4 +44,3 @@ pub struct TreeStats {
     /// Reclaimable bytes.
     pub wasted_bytes: u64,
 }
-

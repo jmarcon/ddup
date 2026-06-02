@@ -35,7 +35,9 @@ impl FromStr for ScanMode {
         match value {
             "smart" => Ok(Self::Smart),
             "flat" => Ok(Self::Flat),
-            other => Err(CoreError::InvalidState(format!("unknown scan mode: {other}"))),
+            other => Err(CoreError::InvalidState(format!(
+                "unknown scan mode: {other}"
+            ))),
         }
     }
 }
@@ -58,4 +60,3 @@ pub struct Scan {
     /// Bytes that can be reclaimed.
     pub wasted_bytes: u64,
 }
-

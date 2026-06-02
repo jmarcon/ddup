@@ -41,7 +41,9 @@ impl FromStr for EntryStatus {
             "kept" => Ok(Self::Kept),
             "deleted" => Ok(Self::Deleted),
             "moved" => Ok(Self::Moved),
-            other => Err(CoreError::InvalidState(format!("unknown entry status: {other}"))),
+            other => Err(CoreError::InvalidState(format!(
+                "unknown entry status: {other}"
+            ))),
         }
     }
 }
@@ -81,8 +83,9 @@ impl FromStr for DupStatus {
             "dup_dir" => Ok(Self::DupDir),
             "dup_file" => Ok(Self::DupFile),
             "partial" => Ok(Self::Partial),
-            other => Err(CoreError::InvalidState(format!("unknown duplicate status: {other}"))),
+            other => Err(CoreError::InvalidState(format!(
+                "unknown duplicate status: {other}"
+            ))),
         }
     }
 }
-

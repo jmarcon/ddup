@@ -59,4 +59,3 @@ pub struct DupFileGroup {
     /// Duplicate file entries.
     pub entries: Vec<DupFileEntry>,
 }
-
