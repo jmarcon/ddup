@@ -7,5 +7,12 @@ name = "ddup-core"
 version = "0.1.0"
 
 [[package]]
+name = "ddup-tui"
+version = "0.1.0"
+dependencies = [
+ "ddup-core",
+]
+
+[[package]]
 name = "ddup-workspace"
 version = "0.1.0"

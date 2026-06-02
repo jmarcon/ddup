@@ -1,0 +1,7 @@
+[package]
+name = "ddup-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ddup-core = { path = "../ddup-core" }
