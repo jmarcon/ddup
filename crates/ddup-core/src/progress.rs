@@ -7,6 +7,11 @@ use crate::Scan;
 /// Progress event emitted by the scanner.
 #[derive(Clone, Debug)]
 pub enum ScanEvent {
+    /// Filesystem discovery started.
+    WalkStarted {
+        /// Scan root.
+        root: PathBuf,
+    },
     /// Scan started.
     Started {
         /// Estimated directory count.

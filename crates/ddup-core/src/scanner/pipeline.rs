@@ -39,6 +39,12 @@ pub fn scan(
     mode: ScanMode,
     progress: Option<ProgressTx>,
 ) -> Result<ScanResult> {
+    send_event(
+        progress.as_ref(),
+        ScanEvent::WalkStarted {
+            root: root.to_path_buf(),
+        },
+    );
     let (nodes, walk_errors) = walk_with_errors(root, cfg)?;
     for message in walk_errors {
         send_event(

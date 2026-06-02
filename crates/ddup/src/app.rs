@@ -118,6 +118,8 @@ pub struct AppState {
     pub scan_total: Option<usize>,
     /// Scan phase label.
     pub scan_phase: String,
+    /// Current scan detail.
+    pub scan_detail: String,
     /// Scan errors.
     pub scan_errors: Vec<String>,
 }
@@ -147,6 +149,7 @@ impl AppState {
             scan_current: 0,
             scan_total: None,
             scan_phase: "Idle".to_owned(),
+            scan_detail: String::new(),
             scan_errors: Vec::new(),
         })
     }
@@ -166,7 +169,8 @@ impl AppState {
         self.scan_running = true;
         self.scan_current = 0;
         self.scan_total = None;
-        "Starting scan".clone_into(&mut self.scan_phase);
+        "Discovering filesystem".clone_into(&mut self.scan_phase);
+        "Counting directories and files before hashing".clone_into(&mut self.scan_detail);
         "Scanning".clone_into(&mut self.status_msg);
         self.scan_errors.clear();
     }
@@ -174,26 +178,38 @@ impl AppState {
     /// Applies scanner progress event.
     pub fn apply_scan_event(&mut self, event: ScanEvent) {
         match event {
+            ScanEvent::WalkStarted { root } => {
+                "Discovering filesystem".clone_into(&mut self.scan_phase);
+                self.scan_detail = format!("Walking {}", root.display());
+            }
             ScanEvent::Started {
                 total_dirs_estimate,
             } => {
                 self.scan_total = Some(total_dirs_estimate);
-                "Walking complete; hashing directories".clone_into(&mut self.scan_phase);
+                "Hashing files and directories".clone_into(&mut self.scan_phase);
+                self.scan_detail = format!("{total_dirs_estimate} directories discovered");
             }
             ScanEvent::DirHashed { path, current } => {
                 self.scan_current = current;
-                self.scan_phase = format!("Hashing {}", path.display());
+                "Hashing files and directories".clone_into(&mut self.scan_phase);
+                self.scan_detail = format!("Current directory: {}", path.display());
             }
             ScanEvent::FileDupsComputed { count } => {
-                self.scan_phase = format!("File duplicate groups: {count}");
+                "Computing duplicate file groups".clone_into(&mut self.scan_phase);
+                self.scan_detail = format!("{count} duplicate file groups found");
             }
             ScanEvent::TreeStatsBuilt => {
                 "Building tree statistics".clone_into(&mut self.scan_phase);
+                "Preparing treemap/sunburst data".clone_into(&mut self.scan_detail);
             }
             ScanEvent::Finished { summary } => {
                 self.scan_current = summary.total_dirs.try_into().unwrap_or(usize::MAX);
                 self.scan_total = Some(self.scan_current);
                 "Persisting results".clone_into(&mut self.scan_phase);
+                self.scan_detail = format!(
+                    "{} dirs, {} files, {} wasted bytes",
+                    summary.total_dirs, summary.total_files, summary.wasted_bytes
+                );
             }
             ScanEvent::Error { path, message } => {
                 let prefix =

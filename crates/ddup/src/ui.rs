@@ -99,9 +99,9 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
     let area = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(35),
-            Constraint::Length(7),
-            Constraint::Percentage(35),
+            Constraint::Percentage(30),
+            Constraint::Length(11),
+            Constraint::Percentage(30),
         ])
         .split(f.area())[1];
     let area = Layout::default()
@@ -117,6 +117,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         .constraints([
             Constraint::Length(3),
             Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Length(1),
         ])
         .split(area);
@@ -129,28 +130,45 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         u16::try_from(value.min(100)).unwrap_or(100)
     });
     let label = app.scan_total.map_or_else(
-        || "Preparing scan".to_owned(),
-        |total| format!("{} / {} dirs", app.scan_current, total),
+        || "Discovery phase".to_owned(),
+        |total| format!("{percent}% - {} / {} directories", app.scan_current, total),
     );
 
     f.render_widget(Clear, area);
     f.render_widget(
         Paragraph::new(app.scan_phase.clone())
             .alignment(Alignment::Center)
-            .block(Block::new().title("Scanning").borders(Borders::ALL))
+            .block(Block::new().title("Scan progress").borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
         rows[0],
     );
     f.render_widget(
-        Gauge::default()
-            .block(Block::new().borders(Borders::ALL))
-            .gauge_style(ratatui::style::Style::default())
-            .percent(percent)
-            .label(label),
+        Paragraph::new(shorten(&app.scan_detail, 120))
+            .alignment(Alignment::Center)
+            .block(Block::new().title("Current step").borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
         rows[1],
     );
     f.render_widget(
-        Paragraph::new("q/Esc exits after current screen update").alignment(Alignment::Center),
+        Gauge::default()
+            .block(Block::new().title("Progress").borders(Borders::ALL))
+            .gauge_style(ratatui::style::Style::default())
+            .percent(percent)
+            .label(label),
         rows[2],
     );
+    f.render_widget(
+        Paragraph::new("q/Esc exits").alignment(Alignment::Center),
+        rows[3],
+    );
+}
+
+fn shorten(value: &str, max_chars: usize) -> String {
+    let mut chars = value.chars();
+    let shortened = chars.by_ref().take(max_chars).collect::<String>();
+    if chars.next().is_some() {
+        format!("{shortened}...")
+    } else {
+        shortened
+    }
 }
