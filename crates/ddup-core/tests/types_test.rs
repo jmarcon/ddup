@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use std::str::FromStr;
 
-use ddup_core::{DirHash, DupStatus, EntryStatus, FileHash};
+use ddup_core::{DirHash, DupStatus, EntryStatus, FileHash, ScanMode};
 
 #[test]
 fn hash_json_round_trip() {
@@ -55,4 +55,17 @@ fn dup_status_round_trip() {
     assert_eq!(status, DupStatus::DupDir);
     assert_eq!(status.to_string(), "dup_dir");
     assert_eq!(serde_json::to_string(&status).unwrap(), "\"dup_dir\"");
+}
+
+#[test]
+fn scan_mode_round_trip() {
+    let mode = ScanMode::from_str("smart").unwrap();
+
+    assert_eq!(mode, ScanMode::Smart);
+    assert_eq!(mode.to_string(), "smart");
+}
+
+#[test]
+fn scan_mode_defaults_to_smart() {
+    assert_eq!(ScanMode::default(), ScanMode::Smart);
 }
