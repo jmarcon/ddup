@@ -35,8 +35,12 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         .split(chunks[1]);
 
     f.render_widget(
-        Paragraph::new(format!("{:?}", app.view_mode))
-            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_PURPLE)),
+        Paragraph::new(format!(
+            "{:?} | SQLite: {}",
+            app.view_mode,
+            app.db_path.display()
+        ))
+        .style(Style::default().bg(DRACULA_BG).fg(DRACULA_PURPLE)),
         chunks[0],
     );
     let items = app
