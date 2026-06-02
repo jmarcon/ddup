@@ -327,6 +327,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ddup"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "crossterm",
+ "ddup-core",
+ "dirs",
+ "ratatui",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "ddup-core"
 version = "0.1.0"
 dependencies = [
@@ -342,19 +355,6 @@ dependencies = [
  "thiserror",
  "tracing",
  "walkdir",
-]
-
-[[package]]
-name = "ddup-tui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "crossterm",
- "ddup-core",
- "dirs",
- "ratatui",
- "tracing-subscriber",
 ]
 
 [[package]]

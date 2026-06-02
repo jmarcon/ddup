@@ -5,8 +5,8 @@ CLI/TUI Rust para detectar diretórios e arquivos duplicados.
 ## Uso
 
 ```powershell
-cargo install --path crates/ddup-tui
-ddup-tui C:\path\to\scan --mode smart
+cargo install --path crates/ddup
+ddup C:\path\to\scan --mode smart
 ```
 
 ## API Rust
@@ -34,4 +34,3 @@ Use `Db::fetch_subtree` para sunburst.
 Smart suprime arquivos duplicados dentro de diretórios duplicados.
 
 Flat mostra todos os arquivos duplicados.
-

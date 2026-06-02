@@ -17,5 +17,5 @@ fn main() {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     let _ = AppState::new(&args);
-    println!("ddup tui");
+    println!("ddup");
 }
