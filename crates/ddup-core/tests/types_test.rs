@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use ddup_core::{
     DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
-    NodeKind, ScanMode, TreeStats,
+    NodeKind, ScanMode, SortBy, SortConfig, SortOrder, TreeStats,
 };
 
 #[test]
@@ -177,4 +177,27 @@ fn tree_stats_optional_fields_serialize_as_null() {
     assert!(value.get("extension").unwrap().is_null());
     assert!(value.get("dir_group_id").unwrap().is_null());
     assert!(value.get("file_group_id").unwrap().is_null());
+}
+
+#[test]
+fn sort_config_default() {
+    let sort = SortConfig::default();
+
+    assert_eq!(sort.by, SortBy::Name);
+    assert_eq!(sort.order, SortOrder::Asc);
+}
+
+#[test]
+fn sort_config_next_by_cycles() {
+    let mut sort = SortConfig::default();
+
+    sort.next_by();
+    assert_eq!(sort.by, SortBy::TotalSize);
+    sort.next_by();
+    assert_eq!(sort.by, SortBy::FileCount);
+    sort.next_by();
+    assert_eq!(sort.by, SortBy::Name);
+
+    sort.toggle_order();
+    assert_eq!(sort.order, SortOrder::Desc);
 }
