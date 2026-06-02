@@ -19,4 +19,4 @@ pub use types::{
     DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
     NodeKind, Scan, ScanMode, SortBy, SortConfig, SortOrder, TreeStats,
 };
-pub use walker::{DirNode, FileEntry, WalkConfig, walk};
+pub use walker::{DirNode, FileEntry, WalkConfig, walk, walk_with_errors};

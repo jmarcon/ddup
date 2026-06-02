@@ -12,11 +12,17 @@ use crate::{CoreError, Result};
 
 /// Walks `root` recursively and returns directory nodes in post-order.
 pub fn walk(root: &Path, cfg: &WalkConfig) -> Result<Vec<DirNode>> {
+    walk_with_errors(root, cfg).map(|(nodes, _errors)| nodes)
+}
+
+/// Walks `root` recursively and returns directory nodes plus non-fatal errors.
+pub fn walk_with_errors(root: &Path, cfg: &WalkConfig) -> Result<(Vec<DirNode>, Vec<String>)> {
     if !root.exists() {
         return Err(CoreError::PathNotFound(root.to_path_buf()));
     }
 
     let mut nodes = BTreeMap::<PathBuf, DirNode>::new();
+    let mut errors = Vec::new();
     let walker = WalkDir::new(root)
         .follow_links(cfg.follow_symlinks)
         .contents_first(true)
@@ -26,7 +32,7 @@ pub fn walk(root: &Path, cfg: &WalkConfig) -> Result<Vec<DirNode>> {
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
-                tracing::warn!("walk error: {error}");
+                errors.push(format!("walk error: {error}"));
                 continue;
             }
         };
@@ -42,7 +48,7 @@ pub fn walk(root: &Path, cfg: &WalkConfig) -> Result<Vec<DirNode>> {
             let metadata = match entry.metadata() {
                 Ok(metadata) => metadata,
                 Err(error) => {
-                    tracing::warn!("metadata error at {}: {error}", path.display());
+                    errors.push(format!("metadata error at {}: {error}", path.display()));
                     continue;
                 }
             };
@@ -84,7 +90,7 @@ pub fn walk(root: &Path, cfg: &WalkConfig) -> Result<Vec<DirNode>> {
             .cmp(&a.path.components().count())
             .then(a.path.cmp(&b.path))
     });
-    Ok(out)
+    Ok((out, errors))
 }
 
 fn should_keep(entry: &WalkDirEntry, root: &Path, cfg: &WalkConfig) -> bool {

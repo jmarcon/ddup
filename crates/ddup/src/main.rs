@@ -18,7 +18,6 @@ use ddup_core::{ScanMode, ScanResult, WalkConfig, scan};
 use crate::app::{AppState, Args, ViewMode};
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
     let args = Args::parse();
     let mut app = AppState::new(&args)?;
     let (progress_tx, progress_rx) = mpsc::channel();

@@ -6,4 +6,4 @@ mod walk;
 
 pub use config::WalkConfig;
 pub use node::{DirNode, FileEntry};
-pub use walk::walk;
+pub use walk::{walk, walk_with_errors};

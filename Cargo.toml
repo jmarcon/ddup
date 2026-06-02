@@ -28,6 +28,7 @@ doc_markdown = "allow"
 needless_pass_by_value = "allow"
 too_many_arguments = "allow"
 collapsible_if = "allow"
+too_many_lines = "allow"
 
 [lints]
 workspace = true

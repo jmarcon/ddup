@@ -15,7 +15,8 @@ use super::{
 };
 use crate::{
     DirHash, DirNode, DupFileGroup, DupGroup, FileEntry, FileHash, ProgressTx, Result, Scan,
-    ScanEvent, ScanMode, TreeStats, WalkConfig, hash_dir, hash_file, progress::send_event, walk,
+    ScanEvent, ScanMode, TreeStats, WalkConfig, hash_dir, hash_file, progress::send_event,
+    walk_with_errors,
 };
 
 /// Scan result.
@@ -38,7 +39,16 @@ pub fn scan(
     mode: ScanMode,
     progress: Option<ProgressTx>,
 ) -> Result<ScanResult> {
-    let nodes = walk(root, cfg)?;
+    let (nodes, walk_errors) = walk_with_errors(root, cfg)?;
+    for message in walk_errors {
+        send_event(
+            progress.as_ref(),
+            ScanEvent::Error {
+                path: None,
+                message,
+            },
+        );
+    }
     send_event(
         progress.as_ref(),
         ScanEvent::Started {
