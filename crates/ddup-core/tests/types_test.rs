@@ -4,7 +4,12 @@ use std::collections::HashMap;
 
 use std::str::FromStr;
 
-use ddup_core::{DirHash, DupStatus, EntryStatus, FileHash, ScanMode};
+use std::path::PathBuf;
+
+use ddup_core::{
+    DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
+    ScanMode,
+};
 
 #[test]
 fn hash_json_round_trip() {
@@ -68,4 +73,61 @@ fn scan_mode_round_trip() {
 #[test]
 fn scan_mode_defaults_to_smart() {
     assert_eq!(ScanMode::default(), ScanMode::Smart);
+}
+
+#[test]
+fn dup_group_round_trip() {
+    let group = DupGroup {
+        id: Some(1),
+        dir_hash: DirHash::new("dir"),
+        file_count: 2,
+        size_bytes: 10,
+        entries: vec![DupEntry {
+            id: Some(2),
+            path: PathBuf::from("a"),
+            status: EntryStatus::Pending,
+            dir_hash: DirHash::new("dir"),
+        }],
+    };
+
+    let json = serde_json::to_string(&group).unwrap();
+
+    assert_eq!(serde_json::from_str::<DupGroup>(&json).unwrap(), group);
+}
+
+#[test]
+fn dup_file_group_round_trip() {
+    let group = DupFileGroup {
+        id: Some(1),
+        file_hash: FileHash::new("file"),
+        size_bytes: 10,
+        entries: vec![DupFileEntry {
+            id: Some(2),
+            path: PathBuf::from("a.txt"),
+            status: EntryStatus::Pending,
+            suppressed_by_dir_group: Some(9),
+        }],
+    };
+
+    let json = serde_json::to_string(&group).unwrap();
+
+    assert_eq!(serde_json::from_str::<DupFileGroup>(&json).unwrap(), group);
+}
+
+#[test]
+fn dup_models_do_not_emit_unknown_fields() {
+    let group = DupFileGroup {
+        id: None,
+        file_hash: FileHash::new("file"),
+        size_bytes: 10,
+        entries: Vec::new(),
+    };
+    let value = serde_json::to_value(group).unwrap();
+    let object = value.as_object().unwrap();
+
+    assert!(object.contains_key("id"));
+    assert!(object.contains_key("file_hash"));
+    assert!(object.contains_key("size_bytes"));
+    assert!(object.contains_key("entries"));
+    assert_eq!(object.len(), 4);
 }

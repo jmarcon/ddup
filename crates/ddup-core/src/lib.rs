@@ -4,4 +4,7 @@ pub mod error;
 pub mod types;
 
 pub use error::{CoreError, Result};
-pub use types::{DirHash, DupStatus, EntryStatus, FileHash, Scan, ScanMode};
+pub use types::{
+    DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
+    Scan, ScanMode,
+};
