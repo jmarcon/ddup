@@ -2,10 +2,10 @@
 
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout},
     text::Line,
     widgets::Clear,
-    widgets::{Block, Borders, List, ListItem, Paragraph},
+    widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
 };
 
 use crate::{
@@ -20,7 +20,7 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         .constraints([
             Constraint::Length(1),
             Constraint::Min(3),
-            Constraint::Length(2),
+            Constraint::Length(5),
         ])
         .split(f.area());
     let body = Layout::default()
@@ -47,7 +47,27 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         Paragraph::new(details).block(Block::new().borders(Borders::ALL)),
         body[1],
     );
-    f.render_widget(Paragraph::new(app.status_msg.clone()), chunks[2]);
+    let errors = if app.scan_errors.is_empty() {
+        "No scan errors".to_owned()
+    } else {
+        app.scan_errors
+            .iter()
+            .rev()
+            .take(4)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    f.render_widget(
+        Paragraph::new(errors)
+            .block(Block::new().title("Scan errors").borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
+        chunks[2],
+    );
+
+    if app.scan_running {
+        render_scan_overlay(f, app);
+    }
 
     if !matches!(app.modal, Modal::None) {
         let area = Layout::default()
@@ -73,4 +93,64 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
             area,
         );
     }
+}
+
+fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(35),
+            Constraint::Length(7),
+            Constraint::Percentage(35),
+        ])
+        .split(f.area())[1];
+    let area = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(25),
+            Constraint::Percentage(50),
+            Constraint::Percentage(25),
+        ])
+        .split(area)[1];
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(1),
+        ])
+        .split(area);
+    let percent = app.scan_total.map_or(0, |total| {
+        let value = app
+            .scan_current
+            .saturating_mul(100)
+            .checked_div(total)
+            .unwrap_or(0);
+        u16::try_from(value.min(100)).unwrap_or(100)
+    });
+    let label = app.scan_total.map_or_else(
+        || "Preparing scan".to_owned(),
+        |total| format!("{} / {} dirs", app.scan_current, total),
+    );
+
+    f.render_widget(Clear, area);
+    f.render_widget(
+        Paragraph::new(app.scan_phase.clone())
+            .alignment(Alignment::Center)
+            .block(Block::new().title("Scanning").borders(Borders::ALL))
+            .wrap(Wrap { trim: true }),
+        rows[0],
+    );
+    f.render_widget(
+        Gauge::default()
+            .block(Block::new().borders(Borders::ALL))
+            .gauge_style(ratatui::style::Style::default())
+            .percent(percent)
+            .label(label),
+        rows[1],
+    );
+    f.render_widget(
+        Paragraph::new("q/Esc exits after current screen update").alignment(Alignment::Center),
+        rows[2],
+    );
 }

@@ -4,7 +4,7 @@ use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use ddup_core::{Db, DupFileGroup, DupGroup, Scan, ScanMode, SortConfig};
+use ddup_core::{Db, DupFileGroup, DupGroup, Scan, ScanEvent, ScanMode, SortConfig};
 
 use crate::tree::{TreeModel, build_tree};
 
@@ -110,6 +110,16 @@ pub struct AppState {
     pub should_quit: bool,
     /// Visible tree.
     pub tree: TreeModel,
+    /// Whether a scan is running.
+    pub scan_running: bool,
+    /// Current scan step count.
+    pub scan_current: usize,
+    /// Estimated scan total.
+    pub scan_total: Option<usize>,
+    /// Scan phase label.
+    pub scan_phase: String,
+    /// Scan errors.
+    pub scan_errors: Vec<String>,
 }
 
 impl AppState {
@@ -133,6 +143,11 @@ impl AppState {
             status_msg: "Ready".to_owned(),
             should_quit: false,
             tree: build_tree(ViewMode::DirsDuplicated, &[], &[], sort),
+            scan_running: false,
+            scan_current: 0,
+            scan_total: None,
+            scan_phase: "Idle".to_owned(),
+            scan_errors: Vec::new(),
         })
     }
 
@@ -144,6 +159,63 @@ impl AppState {
             &self.file_groups,
             self.sort,
         );
+    }
+
+    /// Marks scan as started.
+    pub fn begin_scan(&mut self) {
+        self.scan_running = true;
+        self.scan_current = 0;
+        self.scan_total = None;
+        "Starting scan".clone_into(&mut self.scan_phase);
+        "Scanning".clone_into(&mut self.status_msg);
+        self.scan_errors.clear();
+    }
+
+    /// Applies scanner progress event.
+    pub fn apply_scan_event(&mut self, event: ScanEvent) {
+        match event {
+            ScanEvent::Started {
+                total_dirs_estimate,
+            } => {
+                self.scan_total = Some(total_dirs_estimate);
+                "Walking complete; hashing directories".clone_into(&mut self.scan_phase);
+            }
+            ScanEvent::DirHashed { path, current } => {
+                self.scan_current = current;
+                self.scan_phase = format!("Hashing {}", path.display());
+            }
+            ScanEvent::FileDupsComputed { count } => {
+                self.scan_phase = format!("File duplicate groups: {count}");
+            }
+            ScanEvent::TreeStatsBuilt => {
+                "Building tree statistics".clone_into(&mut self.scan_phase);
+            }
+            ScanEvent::Finished { summary } => {
+                self.scan_current = summary.total_dirs.try_into().unwrap_or(usize::MAX);
+                self.scan_total = Some(self.scan_current);
+                "Persisting results".clone_into(&mut self.scan_phase);
+            }
+            ScanEvent::Error { path, message } => {
+                let prefix =
+                    path.map_or_else(String::new, |value| format!("{}: ", value.display()));
+                self.scan_errors.push(format!("{prefix}{message}"));
+            }
+        }
+    }
+
+    /// Marks scan as finished.
+    pub fn finish_scan(&mut self) {
+        self.scan_running = false;
+        "Ready".clone_into(&mut self.status_msg);
+        "Scan complete".clone_into(&mut self.scan_phase);
+    }
+
+    /// Records a fatal scan error.
+    pub fn fail_scan(&mut self, message: String) {
+        self.scan_running = false;
+        self.scan_errors.push(message);
+        "Scan failed".clone_into(&mut self.status_msg);
+        "Scan failed".clone_into(&mut self.scan_phase);
     }
 }
 
