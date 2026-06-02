@@ -5,3 +5,6 @@ edition = "2024"
 
 [dependencies]
 ddup-core = { path = "../ddup-core" }
+
+[lints]
+workspace = true
