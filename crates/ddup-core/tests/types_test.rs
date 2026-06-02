@@ -1,8 +1,10 @@
-#![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+#![allow(missing_docs, clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
 use std::collections::HashMap;
 
-use ddup_core::{DirHash, FileHash};
+use std::str::FromStr;
+
+use ddup_core::{DirHash, DupStatus, EntryStatus, FileHash};
 
 #[test]
 fn hash_json_round_trip() {
@@ -37,3 +39,20 @@ fn dir_hash_and_file_hash_are_distinct_types() {
     assert_eq!(takes_dir_hash(DirHash::new("abc")), "abc");
 }
 
+#[test]
+fn entry_status_round_trip() {
+    let status = EntryStatus::from_str("pending").unwrap();
+
+    assert_eq!(status, EntryStatus::Pending);
+    assert_eq!(status.to_string(), "pending");
+    assert_eq!(serde_json::to_string(&status).unwrap(), "\"pending\"");
+}
+
+#[test]
+fn dup_status_round_trip() {
+    let status = DupStatus::from_str("dup_dir").unwrap();
+
+    assert_eq!(status, DupStatus::DupDir);
+    assert_eq!(status.to_string(), "dup_dir");
+    assert_eq!(serde_json::to_string(&status).unwrap(), "\"dup_dir\"");
+}
