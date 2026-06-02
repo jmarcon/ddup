@@ -23,6 +23,11 @@ unimplemented = "deny"
 dbg_macro = "deny"
 print_stdout = "deny"
 print_stderr = "deny"
+missing_errors_doc = "allow"
+doc_markdown = "allow"
+needless_pass_by_value = "allow"
+too_many_arguments = "allow"
+collapsible_if = "allow"
 
 [lints]
 workspace = true

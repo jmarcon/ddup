@@ -1,21 +1,16 @@
 //! Keyboard event handling.
 
-use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 
 use crate::app::{AppState, Modal, ViewMode};
 
 /// Handles one key event.
-pub fn handle_key(app: &mut AppState, key: KeyEvent) -> Result<()> {
+pub fn handle_key(app: &mut AppState, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
         KeyCode::Char('j') | KeyCode::Down => app.tree.move_cursor(1),
         KeyCode::Char('k') | KeyCode::Up => app.tree.move_cursor(-1),
-        KeyCode::Char('h')
-        | KeyCode::Left
-        | KeyCode::Char('l')
-        | KeyCode::Right
-        | KeyCode::Enter => {
+        KeyCode::Char('h' | 'l') | KeyCode::Left | KeyCode::Right | KeyCode::Enter => {
             app.tree.toggle_expand();
         }
         KeyCode::Char('s') => {
@@ -38,5 +33,4 @@ pub fn handle_key(app: &mut AppState, key: KeyEvent) -> Result<()> {
         KeyCode::Char('?') => app.modal = Modal::Help,
         _ => {}
     }
-    Ok(())
 }

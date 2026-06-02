@@ -72,7 +72,7 @@ fn tree(path: &str, parent: Option<&str>, kind: NodeKind, depth: u32, waste: u64
         parent_path: parent.map(Into::into),
         kind,
         depth,
-        size_bytes: if kind == NodeKind::File { 1 } else { 0 },
+        size_bytes: u64::from(kind == NodeKind::File),
         size_recursive: 1,
         file_count_recursive: 1,
         extension: (kind == NodeKind::File).then_some("txt".to_owned()),

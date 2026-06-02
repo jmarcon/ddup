@@ -1,4 +1,5 @@
 //! ddup terminal UI.
+#![allow(dead_code)]
 
 mod app;
 mod events;

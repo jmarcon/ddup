@@ -12,9 +12,9 @@ use crate::{
 
 pub(crate) fn build_tree_stats(
     nodes: &[DirNode],
-    file_hashes: &HashMap<PathBuf, FileHash>,
-    file_sizes: &HashMap<PathBuf, u64>,
-    dir_hashes: &HashMap<PathBuf, DirHash>,
+    _file_hashes: &HashMap<PathBuf, FileHash>,
+    _file_sizes: &HashMap<PathBuf, u64>,
+    _dir_hashes: &HashMap<PathBuf, DirHash>,
     dir_metadata: &HashMap<PathBuf, DirMeta>,
     dir_groups: &[DupGroup],
     file_groups: &[DupFileGroup],
@@ -117,8 +117,6 @@ pub(crate) fn build_tree_stats(
         }
     }
     rows.sort_by(|a, b| a.path.cmp(&b.path));
-    let _ = file_hashes;
-    let _ = dir_hashes;
     rows
 }
 

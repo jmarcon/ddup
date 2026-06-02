@@ -88,7 +88,7 @@ fn s7_progress_reports_total_dirs() {
         event,
         ScanEvent::Started {
             total_dirs_estimate
-        } if *total_dirs_estimate == result.summary.total_dirs as usize
+        } if u64::try_from(*total_dirs_estimate).is_ok_and(|value| value == result.summary.total_dirs)
     )));
 }
 
