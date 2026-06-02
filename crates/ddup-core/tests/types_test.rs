@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use ddup_core::{
     DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
-    ScanMode,
+    NodeKind, ScanMode, TreeStats,
 };
 
 #[test]
@@ -130,4 +130,51 @@ fn dup_models_do_not_emit_unknown_fields() {
     assert!(object.contains_key("size_bytes"));
     assert!(object.contains_key("entries"));
     assert_eq!(object.len(), 4);
+}
+
+#[test]
+fn tree_stats_round_trip() {
+    let stats = TreeStats {
+        path: PathBuf::from("root/a.txt"),
+        kind: NodeKind::File,
+        parent_path: Some(PathBuf::from("root")),
+        depth: 1,
+        size_bytes: 5,
+        size_recursive: 5,
+        file_count_recursive: 1,
+        extension: Some("txt".to_owned()),
+        dup_status: DupStatus::DupFile,
+        dir_group_id: None,
+        file_group_id: Some(3),
+        wasted_bytes: 5,
+    };
+
+    let json = serde_json::to_string(&stats).unwrap();
+
+    assert_eq!(serde_json::from_str::<TreeStats>(&json).unwrap(), stats);
+}
+
+#[test]
+fn tree_stats_optional_fields_serialize_as_null() {
+    let stats = TreeStats {
+        path: PathBuf::from("root"),
+        kind: NodeKind::Dir,
+        parent_path: None,
+        depth: 0,
+        size_bytes: 0,
+        size_recursive: 0,
+        file_count_recursive: 0,
+        extension: None,
+        dup_status: DupStatus::Unique,
+        dir_group_id: None,
+        file_group_id: None,
+        wasted_bytes: 0,
+    };
+
+    let value = serde_json::to_value(stats).unwrap();
+
+    assert!(value.get("parent_path").unwrap().is_null());
+    assert!(value.get("extension").unwrap().is_null());
+    assert!(value.get("dir_group_id").unwrap().is_null());
+    assert!(value.get("file_group_id").unwrap().is_null());
 }

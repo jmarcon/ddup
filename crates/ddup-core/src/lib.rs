@@ -6,5 +6,5 @@ pub mod types;
 pub use error::{CoreError, Result};
 pub use types::{
     DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
-    Scan, ScanMode,
+    NodeKind, Scan, ScanMode, TreeStats,
 };
