@@ -13,9 +13,9 @@ pub enum CoreError {
         /// Source I/O error.
         source: io::Error,
     },
-    /// Database error placeholder until rusqlite integration.
+    /// Database error.
     #[error("database error: {0}")]
-    Db(String),
+    Db(#[from] rusqlite::Error),
     /// Path does not exist.
     #[error("path not found: {0}")]
     PathNotFound(PathBuf),
