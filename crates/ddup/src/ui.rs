@@ -138,6 +138,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         .constraints([
             Constraint::Length(8),
             Constraint::Length(3),
+            Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Length(1),
         ])
@@ -151,7 +152,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
             .unwrap_or(0);
         u16::try_from(value.min(100)).unwrap_or(100)
     });
-    let label = app.step_progress.total.map_or_else(
+    let progress_text = app.step_progress.total.map_or_else(
         || format!("{} {}", spinner(app), app.scan_phase),
         |total| {
             format!(
@@ -196,18 +197,24 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         rows[1],
     );
     f.render_widget(
+        Paragraph::new(progress_text)
+            .alignment(Alignment::Center)
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_GREEN)),
+        rows[2],
+    );
+    f.render_widget(
         Gauge::default()
             .block(panel("Progress"))
             .gauge_style(Style::default().fg(DRACULA_GREEN).bg(DRACULA_CURRENT_LINE))
             .percent(percent)
-            .label(label),
-        rows[2],
+            .label(""),
+        rows[3],
     );
     f.render_widget(
         Paragraph::new("q/Esc/Ctrl+C exits")
             .alignment(Alignment::Center)
             .style(Style::default().bg(DRACULA_BG).fg(DRACULA_COMMENT)),
-        rows[3],
+        rows[4],
     );
 }
 
