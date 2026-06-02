@@ -3,6 +3,7 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::Clear,
     widgets::{Block, Borders, Gauge, List, ListItem, Paragraph, Wrap},
@@ -15,6 +16,10 @@ use crate::{
 
 /// Renders the application.
 pub fn render(f: &mut Frame<'_>, app: &AppState) {
+    f.render_widget(
+        Block::new().style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG)),
+        f.area(),
+    );
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -28,23 +33,37 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[1]);
 
-    f.render_widget(Paragraph::new(format!("{:?}", app.view_mode)), chunks[0]);
+    f.render_widget(
+        Paragraph::new(format!("{:?}", app.view_mode))
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_PURPLE)),
+        chunks[0],
+    );
     let items = app
         .tree
         .flatten_visible()
         .iter()
-        .map(|node| ListItem::new(Line::from(node.label.clone())))
+        .enumerate()
+        .map(|(index, node)| {
+            let style = if index == app.tree.cursor {
+                Style::default()
+                    .bg(DRACULA_SELECTION)
+                    .fg(DRACULA_CYAN)
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().bg(DRACULA_BG).fg(DRACULA_FG)
+            };
+            ListItem::new(Line::from(node.label.clone())).style(style)
+        })
         .collect::<Vec<_>>();
-    f.render_widget(
-        List::new(items).block(Block::new().borders(Borders::ALL)),
-        body[0],
-    );
+    f.render_widget(List::new(items).block(panel("Duplicates")), body[0]);
     let details = app.tree.selected().map_or_else(
         || "No selection".to_owned(),
         |node| node.path.display().to_string(),
     );
     f.render_widget(
-        Paragraph::new(details).block(Block::new().borders(Borders::ALL)),
+        Paragraph::new(details)
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
+            .block(panel("Details")),
         body[1],
     );
     let errors = if app.scan_errors.is_empty() {
@@ -60,7 +79,8 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
     };
     f.render_widget(
         Paragraph::new(errors)
-            .block(Block::new().title("Scan errors").borders(Borders::ALL))
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_ORANGE))
+            .block(panel("Scan errors"))
             .wrap(Wrap { trim: true }),
         chunks[2],
     );
@@ -89,7 +109,8 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         f.render_widget(Clear, area);
         f.render_widget(
             Paragraph::new(modal_text(&app.modal).unwrap_or_default())
-                .block(Block::new().borders(Borders::ALL)),
+                .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
+                .block(panel("Modal")),
             area,
         );
     }
@@ -161,29 +182,51 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
 
     f.render_widget(
         Paragraph::new(step_lines)
-            .block(Block::new().title("Scan progress").borders(Borders::ALL))
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
+            .block(panel("Scan progress"))
             .wrap(Wrap { trim: true }),
         rows[0],
     );
     f.render_widget(
         Paragraph::new(shorten(&app.scan_detail, 120))
             .alignment(Alignment::Center)
-            .block(Block::new().title("Current step").borders(Borders::ALL))
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_CYAN))
+            .block(panel("Current step"))
             .wrap(Wrap { trim: true }),
         rows[1],
     );
     f.render_widget(
         Gauge::default()
-            .block(Block::new().title("Progress").borders(Borders::ALL))
-            .gauge_style(ratatui::style::Style::default())
+            .block(panel("Progress"))
+            .gauge_style(Style::default().fg(DRACULA_GREEN).bg(DRACULA_CURRENT_LINE))
             .percent(percent)
             .label(label),
         rows[2],
     );
     f.render_widget(
-        Paragraph::new("q/Esc exits").alignment(Alignment::Center),
+        Paragraph::new("q/Esc/Ctrl+C exits")
+            .alignment(Alignment::Center)
+            .style(Style::default().bg(DRACULA_BG).fg(DRACULA_COMMENT)),
         rows[3],
     );
+}
+
+const DRACULA_BG: Color = Color::Rgb(40, 42, 54);
+const DRACULA_CURRENT_LINE: Color = Color::Rgb(68, 71, 90);
+const DRACULA_SELECTION: Color = Color::Rgb(68, 71, 90);
+const DRACULA_FG: Color = Color::Rgb(248, 248, 242);
+const DRACULA_COMMENT: Color = Color::Rgb(98, 114, 164);
+const DRACULA_CYAN: Color = Color::Rgb(139, 233, 253);
+const DRACULA_GREEN: Color = Color::Rgb(80, 250, 123);
+const DRACULA_ORANGE: Color = Color::Rgb(255, 184, 108);
+const DRACULA_PURPLE: Color = Color::Rgb(189, 147, 249);
+
+fn panel(title: &'static str) -> Block<'static> {
+    Block::new()
+        .title(title)
+        .borders(Borders::ALL)
+        .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
+        .border_style(Style::default().fg(DRACULA_PURPLE))
 }
 
 fn step_marker(app: &AppState, step: ScanStep) -> String {
