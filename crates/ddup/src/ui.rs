@@ -4,10 +4,14 @@ use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
     text::Line,
+    widgets::Clear,
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 
-use crate::app::AppState;
+use crate::{
+    app::{AppState, Modal},
+    modal::modal_text,
+};
 
 /// Renders the application.
 pub fn render(f: &mut Frame<'_>, app: &AppState) {
@@ -44,4 +48,29 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         body[1],
     );
     f.render_widget(Paragraph::new(app.status_msg.clone()), chunks[2]);
+
+    if !matches!(app.modal, Modal::None) {
+        let area = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(20),
+                Constraint::Percentage(60),
+                Constraint::Percentage(20),
+            ])
+            .split(f.area())[1];
+        let area = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(20),
+                Constraint::Percentage(60),
+                Constraint::Percentage(20),
+            ])
+            .split(area)[1];
+        f.render_widget(Clear, area);
+        f.render_widget(
+            Paragraph::new(modal_text(&app.modal).unwrap_or_default())
+                .block(Block::new().borders(Borders::ALL)),
+            area,
+        );
+    }
 }

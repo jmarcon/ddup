@@ -1,6 +1,6 @@
 //! Application state.
 
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
@@ -116,6 +116,9 @@ impl AppState {
     /// Builds initial app state.
     pub fn new(args: &Args) -> Result<Self> {
         let db_path = args.db.clone().unwrap_or_else(default_db_path);
+        if let Some(parent) = db_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
         let db = Db::open(&db_path)?;
         let sort = SortConfig::default();
         Ok(Self {
