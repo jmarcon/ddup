@@ -8,12 +8,20 @@ mod tree;
 mod tui_runtime;
 mod ui;
 
-use std::{path::Path, sync::mpsc, thread, time::Duration};
+use std::{
+    io::{self, Write},
+    path::Path,
+    sync::mpsc,
+    thread,
+    time::Duration,
+};
 
 use anyhow::Result;
 use clap::Parser;
 use crossterm::event::{self, Event};
-use ddup_core::{Db, ProgressTx, ScanEvent, ScanMode, ScanResult, WalkConfig, scan};
+use ddup_core::{
+    Db, ProgressTx, ScanEvent, ScanMode, ScanResult, SortConfig, TreeStats, WalkConfig, scan,
+};
 
 use crate::app::{AppState, Args, ViewMode};
 
@@ -22,6 +30,21 @@ fn main() -> Result<()> {
     let mut app = AppState::new(&args)?;
     let (progress_tx, progress_rx) = mpsc::channel();
     let (result_tx, result_rx) = mpsc::channel();
+
+    if args.no_tui {
+        let root = args.path.clone();
+        let db_path = app.db_path.clone();
+        let mode = ScanMode::from(args.mode);
+        let result = scan_and_persist(&root, &db_path, mode, progress_tx)?;
+        let mut stdout = io::stdout().lock();
+        writeln!(stdout, "SQLite: {}", db_path.display())?;
+        writeln!(
+            stdout,
+            "Scan complete: {} dirs, {} files, {} wasted bytes",
+            result.summary.total_dirs, result.summary.total_files, result.summary.wasted_bytes
+        )?;
+        return Ok(());
+    }
 
     if !args.no_walk {
         app.begin_scan();
@@ -43,6 +66,9 @@ fn main() -> Result<()> {
         app.tick_spinner();
         if let Ok(result) = result_rx.try_recv() {
             handle_scan_result(&mut app, result);
+            if args.exit_after_scan {
+                app.should_quit = true;
+            }
         }
         if app.should_quit {
             break;
@@ -89,8 +115,44 @@ fn persist_scan_result(db_path: &Path, result: &ScanResult) -> Result<()> {
     let scan_id = db.upsert_scan(&result.summary)?;
     db.insert_dir_groups(scan_id, &result.dir_groups)?;
     db.insert_file_groups(scan_id, &result.file_groups)?;
-    db.insert_tree_nodes(scan_id, &result.tree_stats)?;
+    let tree_stats = remap_tree_group_ids(&db, scan_id, result)?;
+    db.insert_tree_nodes(scan_id, &tree_stats)?;
     Ok(())
+}
+
+fn remap_tree_group_ids(db: &Db, scan_id: i64, result: &ScanResult) -> Result<Vec<TreeStats>> {
+    let db_dir_groups = db.fetch_dir_groups(scan_id, SortConfig::default())?;
+    let db_file_groups = db.fetch_file_groups(scan_id, SortConfig::default(), false)?;
+    let mut tree_stats = result.tree_stats.clone();
+
+    for node in &mut tree_stats {
+        node.dir_group_id = node.dir_group_id.and_then(|group_id| {
+            result
+                .dir_groups
+                .iter()
+                .find(|group| group.id == Some(group_id))
+                .and_then(|group| {
+                    db_dir_groups
+                        .iter()
+                        .find(|db_group| db_group.dir_hash == group.dir_hash)
+                        .and_then(|db_group| db_group.id)
+                })
+        });
+        node.file_group_id = node.file_group_id.and_then(|group_id| {
+            result
+                .file_groups
+                .iter()
+                .find(|group| group.id == Some(group_id))
+                .and_then(|group| {
+                    db_file_groups
+                        .iter()
+                        .find(|db_group| db_group.file_hash == group.file_hash)
+                        .and_then(|db_group| db_group.id)
+                })
+        });
+    }
+
+    Ok(tree_stats)
 }
 
 fn apply_scan_result(app: &mut AppState, result: ScanResult) {

@@ -36,6 +36,7 @@ pub struct StepProgress {
 
 /// CLI arguments.
 #[derive(Clone, Debug, Parser)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Args {
     /// Path to scan.
     pub path: PathBuf,
@@ -51,6 +52,12 @@ pub struct Args {
     /// Skip scanning.
     #[arg(long)]
     pub no_walk: bool,
+    /// Exit TUI after scan finishes.
+    #[arg(long)]
+    pub exit_after_scan: bool,
+    /// Run scan without opening the TUI.
+    #[arg(long)]
+    pub no_tui: bool,
 }
 
 /// CLI scan mode.
