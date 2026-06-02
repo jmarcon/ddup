@@ -39,6 +39,7 @@ fn main() -> Result<()> {
         for event in progress_rx.try_iter() {
             app.apply_scan_event(event);
         }
+        app.tick_spinner();
         if let Ok(result) = result_rx.try_recv() {
             handle_scan_result(&mut app, result);
         }

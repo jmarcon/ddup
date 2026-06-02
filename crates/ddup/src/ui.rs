@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    app::{AppState, Modal},
+    app::{AppState, Modal, ScanStep},
     modal::modal_text,
 };
 
@@ -99,9 +99,9 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
     let area = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(30),
-            Constraint::Length(11),
-            Constraint::Percentage(30),
+            Constraint::Percentage(25),
+            Constraint::Length(15),
+            Constraint::Percentage(25),
         ])
         .split(f.area())[1];
     let area = Layout::default()
@@ -115,7 +115,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
+            Constraint::Length(8),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(1),
@@ -135,9 +135,22 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
     );
 
     f.render_widget(Clear, area);
+    let steps = [
+        (ScanStep::Discover, "Discover filesystem"),
+        (ScanStep::Hash, "Hash files and directories"),
+        (ScanStep::DirGroups, "Find duplicate directories"),
+        (ScanStep::FileGroups, "Find duplicate files"),
+        (ScanStep::TreeStats, "Build tree statistics"),
+        (ScanStep::Persist, "Persist SQLite results"),
+    ];
+    let step_lines = steps
+        .iter()
+        .map(|(step, label)| format!("{} {}", step_marker(app, *step), label))
+        .collect::<Vec<_>>()
+        .join("\n");
+
     f.render_widget(
-        Paragraph::new(app.scan_phase.clone())
-            .alignment(Alignment::Center)
+        Paragraph::new(step_lines)
             .block(Block::new().title("Scan progress").borders(Borders::ALL))
             .wrap(Wrap { trim: true }),
         rows[0],
@@ -161,6 +174,17 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         Paragraph::new("q/Esc exits").alignment(Alignment::Center),
         rows[3],
     );
+}
+
+fn step_marker(app: &AppState, step: ScanStep) -> String {
+    if app.scan_done_steps.contains(&step) {
+        "[x]".to_owned()
+    } else if app.scan_step == step {
+        let frames = ['/', '-', '\\', '|'];
+        format!("[{}]", frames[app.spinner_index % frames.len()])
+    } else {
+        "[ ]".to_owned()
+    }
 }
 
 fn shorten(value: &str, max_chars: usize) -> String {

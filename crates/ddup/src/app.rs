@@ -8,6 +8,23 @@ use ddup_core::{Db, DupFileGroup, DupGroup, Scan, ScanEvent, ScanMode, SortConfi
 
 use crate::tree::{TreeModel, build_tree};
 
+/// Scan step.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScanStep {
+    /// Discover filesystem.
+    Discover,
+    /// Hash content.
+    Hash,
+    /// Compute duplicate directories.
+    DirGroups,
+    /// Compute duplicate files.
+    FileGroups,
+    /// Build tree statistics.
+    TreeStats,
+    /// Persist results.
+    Persist,
+}
+
 /// CLI arguments.
 #[derive(Clone, Debug, Parser)]
 pub struct Args {
@@ -118,6 +135,12 @@ pub struct AppState {
     pub scan_total: Option<usize>,
     /// Scan phase label.
     pub scan_phase: String,
+    /// Current scan step.
+    pub scan_step: ScanStep,
+    /// Finished scan steps.
+    pub scan_done_steps: Vec<ScanStep>,
+    /// Spinner frame.
+    pub spinner_index: usize,
     /// Current scan detail.
     pub scan_detail: String,
     /// Scan errors.
@@ -149,6 +172,9 @@ impl AppState {
             scan_current: 0,
             scan_total: None,
             scan_phase: "Idle".to_owned(),
+            scan_step: ScanStep::Discover,
+            scan_done_steps: Vec::new(),
+            spinner_index: 0,
             scan_detail: String::new(),
             scan_errors: Vec::new(),
         })
@@ -169,6 +195,9 @@ impl AppState {
         self.scan_running = true;
         self.scan_current = 0;
         self.scan_total = None;
+        self.scan_step = ScanStep::Discover;
+        self.scan_done_steps.clear();
+        self.spinner_index = 0;
         "Discovering filesystem".clone_into(&mut self.scan_phase);
         "Counting directories and files before hashing".clone_into(&mut self.scan_detail);
         "Scanning".clone_into(&mut self.status_msg);
@@ -185,6 +214,8 @@ impl AppState {
             ScanEvent::Started {
                 total_dirs_estimate,
             } => {
+                self.finish_step(ScanStep::Discover);
+                self.scan_step = ScanStep::Hash;
                 self.scan_total = Some(total_dirs_estimate);
                 "Hashing files and directories".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("{total_dirs_estimate} directories discovered");
@@ -195,14 +226,21 @@ impl AppState {
                 self.scan_detail = format!("Current directory: {}", path.display());
             }
             ScanEvent::FileDupsComputed { count } => {
+                self.finish_step(ScanStep::Hash);
+                self.finish_step(ScanStep::DirGroups);
+                self.scan_step = ScanStep::FileGroups;
                 "Computing duplicate file groups".clone_into(&mut self.scan_phase);
                 self.scan_detail = format!("{count} duplicate file groups found");
             }
             ScanEvent::TreeStatsBuilt => {
+                self.finish_step(ScanStep::FileGroups);
+                self.scan_step = ScanStep::TreeStats;
                 "Building tree statistics".clone_into(&mut self.scan_phase);
                 "Preparing treemap/sunburst data".clone_into(&mut self.scan_detail);
             }
             ScanEvent::Finished { summary } => {
+                self.finish_step(ScanStep::TreeStats);
+                self.scan_step = ScanStep::Persist;
                 self.scan_current = summary.total_dirs.try_into().unwrap_or(usize::MAX);
                 self.scan_total = Some(self.scan_current);
                 "Persisting results".clone_into(&mut self.scan_phase);
@@ -221,6 +259,7 @@ impl AppState {
 
     /// Marks scan as finished.
     pub fn finish_scan(&mut self) {
+        self.finish_step(ScanStep::Persist);
         self.scan_running = false;
         "Ready".clone_into(&mut self.status_msg);
         "Scan complete".clone_into(&mut self.scan_phase);
@@ -232,6 +271,19 @@ impl AppState {
         self.scan_errors.push(message);
         "Scan failed".clone_into(&mut self.status_msg);
         "Scan failed".clone_into(&mut self.scan_phase);
+    }
+
+    /// Advances spinner frame.
+    pub fn tick_spinner(&mut self) {
+        if self.scan_running {
+            self.spinner_index = self.spinner_index.wrapping_add(1);
+        }
+    }
+
+    fn finish_step(&mut self, step: ScanStep) {
+        if !self.scan_done_steps.contains(&step) {
+            self.scan_done_steps.push(step);
+        }
     }
 }
 
