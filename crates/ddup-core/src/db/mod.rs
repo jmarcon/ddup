@@ -3,7 +3,7 @@
 use std::{path::Path, str::FromStr};
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, params, types::Type};
 
 use crate::{
     DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
@@ -36,6 +36,9 @@ impl Db {
 
     /// Inserts or replaces a scan by root path.
     pub fn upsert_scan(&self, scan: &Scan) -> Result<i64> {
+        let total_dirs = u64_to_i64(scan.total_dirs, "scan.total_dirs")?;
+        let total_files = u64_to_i64(scan.total_files, "scan.total_files")?;
+        let wasted_bytes = u64_to_i64(scan.wasted_bytes, "scan.wasted_bytes")?;
         self.conn.execute(
             "INSERT OR REPLACE INTO scans
              (root_path, scanned_at, scan_mode, total_dirs, total_files, wasted_bytes)
@@ -44,9 +47,9 @@ impl Db {
                 path_to_string(&scan.root_path),
                 scan.scanned_at.to_rfc3339(),
                 scan.scan_mode.to_string(),
-                scan.total_dirs,
-                scan.total_files,
-                scan.wasted_bytes
+                total_dirs,
+                total_files,
+                wasted_bytes
             ],
         )?;
         Ok(self.conn.query_row(
@@ -102,15 +105,12 @@ impl Db {
     pub fn insert_dir_groups(&mut self, scan_id: i64, groups: &[DupGroup]) -> Result<()> {
         let tx = self.conn.transaction()?;
         for group in groups {
+            let file_count = u64_to_i64(group.file_count, "dup_groups.file_count")?;
+            let size_bytes = u64_to_i64(group.size_bytes, "dup_groups.size_bytes")?;
             tx.execute(
                 "INSERT INTO dup_groups (scan_id, dir_hash, file_count, size_bytes)
                  VALUES (?1, ?2, ?3, ?4)",
-                params![
-                    scan_id,
-                    group.dir_hash.as_str(),
-                    group.file_count,
-                    group.size_bytes
-                ],
+                params![scan_id, group.dir_hash.as_str(), file_count, size_bytes],
             )?;
             let group_id = tx.last_insert_rowid();
             for entry in &group.entries {
@@ -141,10 +141,11 @@ impl Db {
     pub fn insert_file_groups(&mut self, scan_id: i64, groups: &[DupFileGroup]) -> Result<()> {
         let tx = self.conn.transaction()?;
         for group in groups {
+            let size_bytes = u64_to_i64(group.size_bytes, "dup_file_groups.size_bytes")?;
             tx.execute(
                 "INSERT INTO dup_file_groups (scan_id, file_hash, size_bytes)
                  VALUES (?1, ?2, ?3)",
-                params![scan_id, group.file_hash.as_str(), group.size_bytes],
+                params![scan_id, group.file_hash.as_str(), size_bytes],
             )?;
             let group_id = tx.last_insert_rowid();
             for entry in &group.entries {
@@ -179,7 +180,7 @@ impl Db {
             Ok((
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, u64>(2)?,
+                row_u64(row, 2)?,
             ))
         })?)?;
         let mut groups = Vec::new();
@@ -210,20 +211,25 @@ impl Db {
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             )?;
             for node in nodes {
+                let size_bytes = u64_to_i64(node.size_bytes, "tree_nodes.size_bytes")?;
+                let size_recursive = u64_to_i64(node.size_recursive, "tree_nodes.size_recursive")?;
+                let file_count_recursive =
+                    u64_to_i64(node.file_count_recursive, "tree_nodes.file_count_recursive")?;
+                let wasted_bytes = u64_to_i64(node.wasted_bytes, "tree_nodes.wasted_bytes")?;
                 stmt.execute(params![
                     scan_id,
                     path_to_string(&node.path),
                     node.parent_path.as_deref().map(path_to_string),
                     node_kind_to_string(node.kind),
                     node.depth,
-                    node.size_bytes,
-                    node.size_recursive,
-                    node.file_count_recursive,
+                    size_bytes,
+                    size_recursive,
+                    file_count_recursive,
                     node.extension,
                     node.dup_status.to_string(),
                     node.dir_group_id,
                     node.file_group_id,
-                    node.wasted_bytes,
+                    wasted_bytes,
                     node.content_hash
                 ])?;
             }
@@ -344,8 +350,8 @@ impl Db {
             Ok((
                 row.get::<_, i64>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, u64>(2)?,
-                row.get::<_, u64>(3)?,
+                row_u64(row, 2)?,
+                row_u64(row, 3)?,
             ))
         })?)?;
         let mut groups = Vec::new();
@@ -405,6 +411,18 @@ fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn u64_to_i64(value: u64, field: &str) -> Result<i64> {
+    i64::try_from(value)
+        .map_err(|_| crate::CoreError::InvalidState(format!("{field} exceeds SQLite INTEGER")))
+}
+
+fn row_u64(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
+    let value = row.get::<_, i64>(index)?;
+    u64::try_from(value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(index, Type::Integer, Box::new(error))
+    })
+}
+
 fn row_to_scan(row: &rusqlite::Row<'_>) -> rusqlite::Result<Scan> {
     let scanned_at: String = row.get(2)?;
     let scan_mode: String = row.get(3)?;
@@ -416,9 +434,9 @@ fn row_to_scan(row: &rusqlite::Row<'_>) -> rusqlite::Result<Scan> {
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
         scan_mode: ScanMode::from_str(&scan_mode)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
-        total_dirs: row.get(4)?,
-        total_files: row.get(5)?,
-        wasted_bytes: row.get(6)?,
+        total_dirs: row_u64(row, 4)?,
+        total_files: row_u64(row, 5)?,
+        wasted_bytes: row_u64(row, 6)?,
     })
 }
 
@@ -452,15 +470,15 @@ fn row_to_tree(row: &rusqlite::Row<'_>) -> rusqlite::Result<TreeStats> {
         parent_path: row.get::<_, Option<String>>(1)?.map(Into::into),
         kind: parse_node_kind(&kind)?,
         depth: row.get(3)?,
-        size_bytes: row.get(4)?,
-        size_recursive: row.get(5)?,
-        file_count_recursive: row.get(6)?,
+        size_bytes: row_u64(row, 4)?,
+        size_recursive: row_u64(row, 5)?,
+        file_count_recursive: row_u64(row, 6)?,
         extension: row.get(7)?,
         dup_status: DupStatus::from_str(&dup_status)
             .map_err(|error| rusqlite::Error::ToSqlConversionFailure(Box::new(error)))?,
         dir_group_id: row.get(9)?,
         file_group_id: row.get(10)?,
-        wasted_bytes: row.get(11)?,
+        wasted_bytes: row_u64(row, 11)?,
         content_hash: row.get(12)?,
     })
 }

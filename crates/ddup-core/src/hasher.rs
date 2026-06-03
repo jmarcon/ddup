@@ -33,7 +33,7 @@ pub fn hash_file(path: &Path) -> Result<FileHash> {
         hasher.update(&buffer[..read]);
     }
 
-    Ok(FileHash::new(format!("{:x}", hasher.finalize())))
+    Ok(FileHash::new(hex_lower(hasher.finalize())))
 }
 
 /// Combines direct file hashes and child directory hashes into a deterministic directory hash.
@@ -57,5 +57,16 @@ pub fn hash_dir(file_hashes: &[FileHash], child_dir_hashes: &[DirHash]) -> DirHa
     let payload = parts.join("\n");
     let mut hasher = Sha256::new();
     hasher.update(payload.as_bytes());
-    DirHash::new(format!("{:x}", hasher.finalize()))
+    DirHash::new(hex_lower(hasher.finalize()))
+}
+
+fn hex_lower(bytes: impl AsRef<[u8]>) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let bytes = bytes.as_ref();
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        out.push(char::from(HEX[usize::from(byte >> 4)]));
+        out.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    out
 }
