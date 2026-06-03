@@ -1,6 +1,6 @@
 //! Application state.
 
-use std::{fs, path::PathBuf};
+use std::{collections::HashSet, fs, path::PathBuf};
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
@@ -125,6 +125,8 @@ pub struct AppState {
     pub db: Db,
     /// Database path.
     pub db_path: PathBuf,
+    /// Scan root path.
+    pub scan_root: PathBuf,
     /// Current scan.
     pub current_scan: Option<Scan>,
     /// Current view mode.
@@ -145,6 +147,10 @@ pub struct AppState {
     pub should_quit: bool,
     /// Visible tree.
     pub tree: TreeModel,
+    /// Paths selected to delete.
+    pub delete_selected: HashSet<PathBuf>,
+    /// Paths selected to keep.
+    pub keep_selected: HashSet<PathBuf>,
     /// Whether a scan is running.
     pub scan_running: bool,
     /// Current step progress.
@@ -161,6 +167,8 @@ pub struct AppState {
     pub scan_detail: String,
     /// Scan errors.
     pub scan_errors: Vec<String>,
+    /// Re-scan requested by UI.
+    pub rescan_requested: bool,
 }
 
 impl AppState {
@@ -175,6 +183,7 @@ impl AppState {
         Ok(Self {
             db,
             db_path,
+            scan_root: args.path.clone(),
             current_scan: None,
             view_mode: ViewMode::DirsDuplicated,
             dir_groups: Vec::new(),
@@ -184,7 +193,9 @@ impl AppState {
             modal: Modal::None,
             status_msg: "Ready".to_owned(),
             should_quit: false,
-            tree: build_tree(ViewMode::DirsDuplicated, &[], &[], sort),
+            tree: build_tree(ViewMode::DirsDuplicated, &[], &[], sort, &args.path),
+            delete_selected: HashSet::new(),
+            keep_selected: HashSet::new(),
             scan_running: false,
             step_progress: StepProgress {
                 current: 0,
@@ -196,6 +207,7 @@ impl AppState {
             spinner_index: 0,
             scan_detail: String::new(),
             scan_errors: Vec::new(),
+            rescan_requested: false,
         })
     }
 
@@ -206,7 +218,45 @@ impl AppState {
             &self.dir_groups,
             &self.file_groups,
             self.sort,
+            &self.scan_root,
         );
+    }
+
+    /// Toggles selected path as delete target.
+    pub fn toggle_delete_selected(&mut self) {
+        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
+            return;
+        };
+        if path.as_os_str().is_empty() {
+            return;
+        }
+        self.keep_selected.remove(&path);
+        if !self.delete_selected.remove(&path) {
+            self.delete_selected.insert(path);
+        }
+    }
+
+    /// Toggles selected path as keep target.
+    pub fn toggle_keep_selected(&mut self) {
+        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
+            return;
+        };
+        if path.as_os_str().is_empty() {
+            return;
+        }
+        self.delete_selected.remove(&path);
+        if !self.keep_selected.remove(&path) {
+            self.keep_selected.insert(path);
+        }
+    }
+
+    /// Clears selected path decision.
+    pub fn clear_selected_decision(&mut self) {
+        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
+            return;
+        };
+        self.delete_selected.remove(&path);
+        self.keep_selected.remove(&path);
     }
 
     /// Marks scan as started.
@@ -223,6 +273,8 @@ impl AppState {
         "Counting directories and files before hashing".clone_into(&mut self.scan_detail);
         "Scanning".clone_into(&mut self.status_msg);
         self.scan_errors.clear();
+        self.delete_selected.clear();
+        self.keep_selected.clear();
     }
 
     /// Applies scanner progress event.

@@ -36,19 +36,26 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
 
     f.render_widget(
         Paragraph::new(format!(
-            "{:?} | SQLite: {}",
+            "{:?} | Root: {} | DB: {} | Sort: {:?} {:?} (s/o)",
             app.view_mode,
-            app.db_path.display()
+            app.scan_root.display(),
+            app.db_path.display(),
+            app.sort.by,
+            app.sort.order
         ))
         .style(Style::default().bg(DRACULA_BG).fg(DRACULA_PURPLE)),
         chunks[0],
     );
-    let items = app
-        .tree
-        .flatten_visible()
+    let visible_nodes = app.tree.flatten_visible();
+    let list_height = usize::from(body[0].height.saturating_sub(2));
+    let viewport_start = viewport_start(app.tree.cursor, list_height);
+    let items = visible_nodes
         .iter()
+        .skip(viewport_start)
+        .take(list_height)
         .enumerate()
-        .map(|(index, node)| {
+        .map(|(offset, node)| {
+            let index = viewport_start + offset;
             let style = if index == app.tree.cursor {
                 Style::default()
                     .bg(DRACULA_SELECTION)
@@ -57,14 +64,14 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
             } else {
                 Style::default().bg(DRACULA_BG).fg(DRACULA_FG)
             };
-            ListItem::new(Line::from(node.label.clone())).style(style)
+            ListItem::new(Line::from(list_label(app, node))).style(style)
         })
         .collect::<Vec<_>>();
     f.render_widget(List::new(items).block(panel("Duplicates")), body[0]);
-    let details = app
-        .tree
-        .selected()
-        .map_or_else(|| "No selection".to_owned(), selected_details);
+    let details = app.tree.selected().map_or_else(
+        || "No selection".to_owned(),
+        |node| selected_details(app, node),
+    );
     f.render_widget(
         Paragraph::new(details)
             .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
@@ -121,7 +128,33 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
     }
 }
 
-fn selected_details(node: &TreeNode) -> String {
+fn viewport_start(cursor: usize, height: usize) -> usize {
+    if height == 0 {
+        return 0;
+    }
+    cursor.saturating_sub(height.saturating_sub(1))
+}
+
+fn list_label(app: &AppState, node: &TreeNode) -> String {
+    let indent = "  ".repeat(node.depth);
+    let expand = if node.children.is_empty() {
+        " "
+    } else if node.expanded {
+        "v"
+    } else {
+        ">"
+    };
+    let decision = if app.delete_selected.contains(&node.path) {
+        "[D]"
+    } else if app.keep_selected.contains(&node.path) {
+        "[K]"
+    } else {
+        "   "
+    };
+    format!("{decision} {indent}{expand} {}", node.label)
+}
+
+fn selected_details(app: &AppState, node: &TreeNode) -> String {
     let group = node
         .group_id
         .map_or_else(|| "none".to_owned(), |value| value.to_string());
@@ -139,14 +172,28 @@ fn selected_details(node: &TreeNode) -> String {
     } else {
         node.path.display().to_string()
     };
+    let relative = node
+        .path
+        .strip_prefix(&app.scan_root)
+        .map_or_else(|_| path.clone(), |value| value.display().to_string());
+    let decision = if app.delete_selected.contains(&node.path) {
+        "delete"
+    } else if app.keep_selected.contains(&node.path) {
+        "keep"
+    } else {
+        "none"
+    };
 
     [
         format!("Type: {kind}"),
         format!("Group: {group}"),
         format!("Status: {}", node.dup_marker),
+        format!("Selection: {decision}"),
         format!("Entries: {}", node.entry_count),
         format!("Size: {}", format_bytes(node.size_bytes)),
         format!("Files: {file_count}"),
+        format!("Root: {}", app.scan_root.display()),
+        format!("Relative: {relative}"),
         format!("Path: {path}"),
     ]
     .join("\n")
@@ -228,7 +275,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         (ScanStep::DirGroups, "Find duplicate directories"),
         (ScanStep::FileGroups, "Find duplicate files"),
         (ScanStep::TreeStats, "Build tree statistics"),
-        (ScanStep::Persist, "Persist SQLite results"),
+        (ScanStep::Persist, "Save results to SQLite database"),
     ];
     let step_lines = steps
         .iter()

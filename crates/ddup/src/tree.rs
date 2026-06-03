@@ -1,8 +1,8 @@
 //! TUI tree model.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use ddup_core::{DupFileGroup, DupGroup, SortConfig};
+use ddup_core::{DupFileGroup, DupGroup, SortBy, SortConfig, SortOrder};
 
 use crate::app::ViewMode;
 
@@ -24,8 +24,12 @@ pub enum NodeKind {
 pub struct TreeNode {
     /// Path.
     pub path: PathBuf,
+    /// Entry id.
+    pub entry_id: Option<i64>,
     /// Display label.
     pub label: String,
+    /// Visible depth.
+    pub depth: usize,
     /// Kind.
     pub kind: NodeKind,
     /// Expanded state.
@@ -80,6 +84,26 @@ impl TreeModel {
         toggle_at(&mut self.roots, self.cursor, &mut index);
     }
 
+    /// Opens selected node.
+    pub fn open_selected(&mut self) {
+        let mut index = 0;
+        set_expanded_at(&mut self.roots, self.cursor, &mut index, true);
+    }
+
+    /// Closes selected node.
+    pub fn close_selected(&mut self) {
+        let mut index = 0;
+        set_expanded_at(&mut self.roots, self.cursor, &mut index, false);
+    }
+
+    /// Selects visible node by index.
+    pub fn select(&mut self, index: usize) {
+        let len = self.flatten_visible().len();
+        if len > 0 {
+            self.cursor = index.min(len - 1);
+        }
+    }
+
     /// Returns selected visible node.
     #[must_use]
     pub fn selected(&self) -> Option<&TreeNode> {
@@ -93,14 +117,17 @@ pub fn build_tree(
     view: ViewMode,
     dir_groups: &[DupGroup],
     file_groups: &[DupFileGroup],
-    _sort: SortConfig,
+    sort: SortConfig,
+    root: &Path,
 ) -> TreeModel {
     let roots = match view {
-        ViewMode::DirsDuplicated => dir_groups
-            .iter()
+        ViewMode::DirsDuplicated => sorted_dir_groups(dir_groups, sort)
+            .into_iter()
             .map(|group| TreeNode {
                 path: PathBuf::new(),
+                entry_id: None,
                 label: format!("Dir group {}", group.id.unwrap_or_default()),
+                depth: 0,
                 kind: NodeKind::GroupRoot,
                 expanded: true,
                 group_id: group.id,
@@ -110,7 +137,9 @@ pub fn build_tree(
                     .iter()
                     .map(|entry| TreeNode {
                         path: entry.path.clone(),
-                        label: entry.path.display().to_string(),
+                        entry_id: entry.id,
+                        label: relative_label(&entry.path, root),
+                        depth: 1,
                         kind: NodeKind::DirEntry,
                         expanded: false,
                         children: Vec::new(),
@@ -126,38 +155,85 @@ pub fn build_tree(
                 file_count: Some(group.file_count),
             })
             .collect(),
-        ViewMode::FilesDuplicatedSmart | ViewMode::FilesDuplicatedFlat => file_groups
-            .iter()
-            .map(|group| TreeNode {
-                path: PathBuf::new(),
-                label: format!("File group {}", group.id.unwrap_or_default()),
-                kind: NodeKind::GroupRoot,
-                expanded: true,
-                group_id: group.id,
-                dup_marker: "file".to_owned(),
-                children: group
-                    .entries
-                    .iter()
-                    .map(|entry| TreeNode {
-                        path: entry.path.clone(),
-                        label: entry.path.display().to_string(),
-                        kind: NodeKind::FileEntry,
-                        expanded: false,
-                        children: Vec::new(),
-                        group_id: group.id,
-                        dup_marker: entry.status.to_string(),
-                        entry_count: group.entries.len(),
-                        size_bytes: group.size_bytes,
-                        file_count: None,
-                    })
-                    .collect(),
-                entry_count: group.entries.len(),
-                size_bytes: group.size_bytes,
-                file_count: None,
-            })
-            .collect(),
+        ViewMode::FilesDuplicatedSmart | ViewMode::FilesDuplicatedFlat => {
+            sorted_file_groups(file_groups, sort)
+                .into_iter()
+                .map(|group| TreeNode {
+                    path: PathBuf::new(),
+                    entry_id: None,
+                    label: format!("File group {}", group.id.unwrap_or_default()),
+                    depth: 0,
+                    kind: NodeKind::GroupRoot,
+                    expanded: true,
+                    group_id: group.id,
+                    dup_marker: "file".to_owned(),
+                    children: group
+                        .entries
+                        .iter()
+                        .map(|entry| TreeNode {
+                            path: entry.path.clone(),
+                            entry_id: entry.id,
+                            label: relative_label(&entry.path, root),
+                            depth: 1,
+                            kind: NodeKind::FileEntry,
+                            expanded: false,
+                            children: Vec::new(),
+                            group_id: group.id,
+                            dup_marker: entry.status.to_string(),
+                            entry_count: group.entries.len(),
+                            size_bytes: group.size_bytes,
+                            file_count: None,
+                        })
+                        .collect(),
+                    entry_count: group.entries.len(),
+                    size_bytes: group.size_bytes,
+                    file_count: None,
+                })
+                .collect()
+        }
     };
     TreeModel { roots, cursor: 0 }
+}
+
+fn sorted_dir_groups(groups: &[DupGroup], sort: SortConfig) -> Vec<&DupGroup> {
+    let mut groups = groups.iter().collect::<Vec<_>>();
+    groups.sort_by(|a, b| match sort.by {
+        SortBy::Name => a
+            .entries
+            .first()
+            .map(|entry| &entry.path)
+            .cmp(&b.entries.first().map(|entry| &entry.path)),
+        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
+        SortBy::FileCount => a.file_count.cmp(&b.file_count),
+    });
+    if sort.order == SortOrder::Desc {
+        groups.reverse();
+    }
+    groups
+}
+
+fn sorted_file_groups(groups: &[DupFileGroup], sort: SortConfig) -> Vec<&DupFileGroup> {
+    let mut groups = groups.iter().collect::<Vec<_>>();
+    groups.sort_by(|a, b| match sort.by {
+        SortBy::Name => a
+            .entries
+            .first()
+            .map(|entry| &entry.path)
+            .cmp(&b.entries.first().map(|entry| &entry.path)),
+        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
+        SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
+    });
+    if sort.order == SortOrder::Desc {
+        groups.reverse();
+    }
+    groups
+}
+
+fn relative_label(path: &Path, root: &Path) -> String {
+    path.strip_prefix(root)
+        .map_or(path, |relative| relative)
+        .display()
+        .to_string()
 }
 
 fn flatten<'a>(node: &'a TreeNode, out: &mut Vec<&'a TreeNode>) {
@@ -183,6 +259,25 @@ fn toggle_at(nodes: &mut [TreeNode], target: usize, index: &mut usize) -> bool {
     false
 }
 
+fn set_expanded_at(
+    nodes: &mut [TreeNode],
+    target: usize,
+    index: &mut usize,
+    expanded: bool,
+) -> bool {
+    for node in nodes {
+        if *index == target {
+            node.expanded = expanded;
+            return true;
+        }
+        *index += 1;
+        if node.expanded && set_expanded_at(&mut node.children, target, index, expanded) {
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
@@ -194,12 +289,16 @@ mod tests {
             cursor: 0,
             roots: vec![TreeNode {
                 path: PathBuf::from("root"),
+                entry_id: None,
                 label: "root".to_owned(),
+                depth: 0,
                 kind: NodeKind::GroupRoot,
                 expanded: true,
                 children: vec![TreeNode {
                     path: PathBuf::from("child"),
+                    entry_id: Some(1),
                     label: "child".to_owned(),
+                    depth: 1,
                     kind: NodeKind::DirEntry,
                     expanded: false,
                     children: Vec::new(),

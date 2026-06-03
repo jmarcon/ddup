@@ -18,7 +18,7 @@ use std::{
 
 use anyhow::Result;
 use clap::Parser;
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyEventKind};
 use ddup_core::{
     Db, ProgressTx, ScanEvent, ScanMode, ScanResult, SortConfig, TreeStats, WalkConfig, scan,
 };
@@ -46,15 +46,22 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    if !args.no_walk {
-        app.begin_scan();
+    let mut scan_started = false;
+    if !args.rescan {
         let root = args.path.clone();
-        let db_path = app.db_path.clone();
-        let mode = ScanMode::from(args.mode);
-        thread::spawn(move || {
-            let result = scan_and_persist(&root, &db_path, mode, progress_tx);
-            let _ = result_tx.send(result);
-        });
+        if load_scan_from_db(&mut app, &root)? {
+            scan_started = true;
+        }
+    }
+
+    if !args.no_walk && (!scan_started || args.rescan) {
+        start_scan(
+            &mut app,
+            args.path.clone(),
+            ScanMode::from(args.mode),
+            progress_tx.clone(),
+            result_tx.clone(),
+        );
     }
 
     let mut terminal = tui_runtime::enter()?;
@@ -73,10 +80,27 @@ fn main() -> Result<()> {
         if app.should_quit {
             break;
         }
-        if event::poll(Duration::from_millis(100))?
-            && let Event::Key(key) = event::read()?
-        {
-            events::handle_key(&mut app, key);
+        if event::poll(Duration::from_millis(100))? {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    events::handle_key(&mut app, key);
+                }
+                Event::Mouse(mouse) => {
+                    let size = terminal.size()?;
+                    events::handle_mouse(&mut app, mouse, size.width, size.height);
+                }
+                _ => {}
+            }
+        }
+        if app.rescan_requested && !app.scan_running {
+            app.rescan_requested = false;
+            start_scan(
+                &mut app,
+                args.path.clone(),
+                ScanMode::from(args.mode),
+                progress_tx.clone(),
+                result_tx.clone(),
+            );
         }
     }
     tui_runtime::leave(&mut terminal)?;
@@ -86,11 +110,30 @@ fn main() -> Result<()> {
 fn handle_scan_result(app: &mut AppState, result: Result<ScanResult>) {
     match result {
         Ok(result) => {
-            apply_scan_result(app, result);
-            app.finish_scan();
+            if let Err(error) = apply_scan_result(app, result) {
+                app.fail_scan(error.to_string());
+            } else {
+                app.finish_scan();
+            }
         }
         Err(error) => app.fail_scan(error.to_string()),
     }
+}
+
+fn start_scan(
+    app: &mut AppState,
+    root: std::path::PathBuf,
+    mode: ScanMode,
+    progress_tx: ProgressTx,
+    result_tx: mpsc::Sender<Result<ScanResult>>,
+) {
+    app.scan_root.clone_from(&root);
+    app.begin_scan();
+    let db_path = app.db_path.clone();
+    thread::spawn(move || {
+        let result = scan_and_persist(&root, &db_path, mode, progress_tx);
+        let _ = result_tx.send(result);
+    });
 }
 
 fn scan_and_persist(
@@ -155,10 +198,24 @@ fn remap_tree_group_ids(db: &Db, scan_id: i64, result: &ScanResult) -> Result<Ve
     Ok(tree_stats)
 }
 
-fn apply_scan_result(app: &mut AppState, result: ScanResult) {
-    app.current_scan = Some(result.summary);
-    app.dir_groups = result.dir_groups;
-    app.file_groups = result.file_groups;
+fn load_scan_from_db(app: &mut AppState, root: &Path) -> Result<bool> {
+    let Some(scan) = app.db.fetch_scan(root)? else {
+        return Ok(false);
+    };
+    let Some(scan_id) = scan.id else {
+        return Ok(false);
+    };
+    app.current_scan = Some(scan);
+    app.dir_groups = app.db.fetch_dir_groups(scan_id, app.sort)?;
+    app.file_groups = app.db.fetch_file_groups(scan_id, app.sort, false)?;
+    app.scan_root = root.to_path_buf();
     app.view_mode = ViewMode::DirsDuplicated;
     app.rebuild_tree();
+    Ok(true)
+}
+
+fn apply_scan_result(app: &mut AppState, result: ScanResult) -> Result<()> {
+    let root = result.summary.root_path;
+    let _ = load_scan_from_db(app, &root)?;
+    Ok(())
 }
