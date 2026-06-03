@@ -477,3 +477,29 @@ fn d30_fetch_subtree_10k_under_500ms() {
     assert_eq!(fetched.len(), 10_001);
     assert!(start.elapsed().as_millis() < 500);
 }
+
+#[test]
+fn d32_fetch_subtree_does_not_include_sibling_with_same_text_prefix() {
+    let mut db = Db::memory().unwrap();
+    let scan_id = db.upsert_scan(&scan("root", ScanMode::Smart)).unwrap();
+    db.insert_tree_nodes(
+        scan_id,
+        &[
+            tree("root", None, NodeKind::Dir, 0, 0),
+            tree("root/a.txt", Some("root"), NodeKind::File, 1, 0),
+            tree("root2", None, NodeKind::Dir, 0, 0),
+            tree("root2/b.txt", Some("root2"), NodeKind::File, 1, 0),
+        ],
+    )
+    .unwrap();
+
+    let fetched = db.fetch_subtree(scan_id, "root".as_ref(), None).unwrap();
+    let paths = fetched
+        .into_iter()
+        .map(|node| node.path)
+        .collect::<Vec<_>>();
+
+    assert_eq!(paths.len(), 2);
+    assert!(paths.contains(&"root".into()));
+    assert!(paths.contains(&"root/a.txt".into()));
+}

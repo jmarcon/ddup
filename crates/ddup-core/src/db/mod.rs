@@ -271,14 +271,13 @@ impl Db {
         root: &Path,
         max_depth: Option<u32>,
     ) -> Result<Vec<TreeStats>> {
-        let root_string = path_to_string(root);
         let root_depth = self.fetch_node(scan_id, root)?.map_or(0, |node| node.depth);
         let all = self.fetch_subtree_filtered(scan_id, root, false)?;
         Ok(all
             .into_iter()
             .filter(|node| {
                 max_depth.is_none_or(|max| node.depth.saturating_sub(root_depth) <= max)
-                    && path_to_string(&node.path).starts_with(&root_string)
+                    && node.path.starts_with(root)
             })
             .collect())
     }
@@ -300,6 +299,7 @@ impl Db {
         let rows = collect_rows(stmt.query_map(params![scan_id, pattern], row_to_tree)?)?;
         Ok(rows
             .into_iter()
+            .filter(|node| node.path.starts_with(root))
             .filter(|node| !only_with_waste || node.wasted_bytes > 0)
             .collect())
     }
