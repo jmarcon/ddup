@@ -27,8 +27,30 @@ Invoke-Step "unit and integration tests" {
     cargo test --workspace
 }
 
+Invoke-Step "core has 75+ tests" {
+    $output = cargo test -p ddup-core -- --list 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $output | Write-Host
+        exit $LASTEXITCODE
+    }
+    $count = ($output | Select-String -Pattern ': test$').Count
+    if ($count -lt 75) {
+        throw "Expected at least 75 ddup-core tests, found $count"
+    }
+    Write-Host "Core tests: $count"
+}
+
 Invoke-Step "e2e tests" {
     ./scripts/run-e2e.ps1
+}
+
+Invoke-Step "CI and release workflows exist" {
+    if (-not (Test-Path -LiteralPath ".github/workflows/ci.yml")) {
+        throw "Missing .github/workflows/ci.yml"
+    }
+    if (-not (Test-Path -LiteralPath ".github/workflows/release.yml")) {
+        throw "Missing .github/workflows/release.yml"
+    }
 }
 
 Invoke-Step "docs" {
