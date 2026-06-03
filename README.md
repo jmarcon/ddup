@@ -55,13 +55,15 @@ Use `s` para alternar por tamanho, repetição do grupo e nome.
 | `f` | Alternar Dirs / Files Smart / Files Flat |
 | `s` | Alternar campo de sort |
 | `r` | Alternar ordem do sort |
-| `d` | Deletar item selecionado com confirmação |
+| `Delete` | Deletar item selecionado com confirmação |
 | `m` | Mover item selecionado |
 | `o` | Abrir no file manager |
 | `c` | Copiar caminho completo |
 | `i` | Ativar/desativar ícones Nerd Fonts |
-| `Space` ou `x` | Marcar/desmarcar item para delete |
-| `p/u/a` | Marcar keep / limpar marca / aplicar marcas |
+| `Space`, `d` ou `x` | Marcar/desmarcar item para delete |
+| `K` | Marcar/desmarcar item para manter |
+| `u` ou `Backspace` | Limpar marca |
+| `a` | Aplicar marcas |
 | `F5` ou `Ctrl+R` | Re-scan |
 | `?` | Help |
 | `q` ou `Esc` | Sair |

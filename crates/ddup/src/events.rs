@@ -29,13 +29,13 @@ pub fn handle_key(app: &mut AppState, key: KeyEvent) {
         KeyCode::Char('h') | KeyCode::Left => app.tree.close_selected(),
         KeyCode::Char('l') | KeyCode::Right => app.tree.open_selected(),
         KeyCode::Enter => app.tree.toggle_expand(),
-        KeyCode::Char('d') => app.confirm_delete_selected(),
+        KeyCode::Delete => app.confirm_delete_selected(),
         KeyCode::Char('m') => app.prompt_move_selected(),
         KeyCode::Char('o') => app.open_selected(),
         KeyCode::Char('c') => app.copy_selected_path(),
-        KeyCode::Char(' ' | 'x') => app.toggle_delete_selected(),
-        KeyCode::Char('p') => app.toggle_keep_selected(),
-        KeyCode::Char('u') => app.clear_selected_decision(),
+        KeyCode::Char(' ' | 'd' | 'x') => app.toggle_delete_selected(),
+        KeyCode::Char('K') => app.toggle_keep_selected(),
+        KeyCode::Char('u') | KeyCode::Backspace => app.clear_selected_decision(),
         KeyCode::Char('a') => app.apply_marked_actions(),
         KeyCode::Char('s') => {
             app.sort.next_by();
@@ -263,10 +263,10 @@ mod tests {
     }
 
     #[test]
-    fn d_opens_delete_confirmation() {
+    fn delete_opens_delete_confirmation() {
         let mut app = app();
 
-        handle_key(&mut app, key(KeyCode::Char('d')));
+        handle_key(&mut app, key(KeyCode::Delete));
 
         assert_eq!(
             app.modal,
@@ -281,10 +281,10 @@ mod tests {
     fn marks_delete_keep_and_clear() {
         let mut app = app();
 
-        handle_key(&mut app, key(KeyCode::Char('x')));
+        handle_key(&mut app, key(KeyCode::Char('d')));
         assert!(app.delete_selected.contains(&PathBuf::from("a")));
 
-        handle_key(&mut app, key(KeyCode::Char('p')));
+        handle_key(&mut app, key(KeyCode::Char('K')));
         assert!(!app.delete_selected.contains(&PathBuf::from("a")));
         assert!(app.keep_selected.contains(&PathBuf::from("a")));
 

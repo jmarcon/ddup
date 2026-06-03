@@ -13,7 +13,7 @@ use ratatui::{
 
 use crate::{
     app::{AppState, Modal, ScanStep},
-    modal::modal_text,
+    modal::{modal_text, modal_title},
     tree::{NodeKind, TreeNode},
 };
 
@@ -124,7 +124,7 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
         f.render_widget(
             Paragraph::new(modal_text(&app.modal).unwrap_or_default())
                 .style(Style::default().bg(DRACULA_BG).fg(DRACULA_FG))
-                .block(panel("Modal")),
+                .block(panel(modal_title(&app.modal))),
             area,
         );
     }
