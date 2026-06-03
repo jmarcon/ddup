@@ -23,11 +23,13 @@ use ddup_core::{
     Db, DupFileGroup, ProgressTx, ScanEvent, ScanMode, ScanResult, SortConfig, TreeStats,
     WalkConfig, scan,
 };
+use tracing_subscriber::EnvFilter;
 
 use crate::app::{AppState, Args, ViewMode};
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    init_tracing(args.no_tui);
     let mut app = AppState::new(&args)?;
     let (progress_tx, progress_rx) = mpsc::channel();
     let (result_tx, result_rx) = mpsc::channel();
@@ -106,6 +108,18 @@ fn main() -> Result<()> {
     }
     tui_runtime::leave(&mut terminal)?;
     Ok(())
+}
+
+fn init_tracing(no_tui: bool) {
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("warn"));
+    if no_tui {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_writer(io::sink)
+            .init();
+    }
 }
 
 fn handle_scan_result(app: &mut AppState, result: Result<ScanResult>) {

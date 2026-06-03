@@ -18,6 +18,15 @@ ddup C:\path\to\scan --db C:\tmp\ddup.sqlite --no-tui
 
 Sem `--db`, o SQLite fica em `AppData\Local\ddup\scans.db` no Windows.
 
+## Logging
+
+`RUST_LOG` controla logs internos, com default `warn`.
+
+```powershell
+$env:RUST_LOG="ddup_core=warn"
+ddup C:\path\to\scan --no-tui
+```
+
 ## Modos
 
 Smart é o default e suprime arquivos duplicados dentro de diretórios já duplicados.

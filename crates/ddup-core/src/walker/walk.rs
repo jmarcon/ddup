@@ -32,6 +32,7 @@ pub fn walk_with_errors(root: &Path, cfg: &WalkConfig) -> Result<(Vec<DirNode>, 
         let entry = match entry {
             Ok(entry) => entry,
             Err(error) => {
+                tracing::warn!("walk error: {error}");
                 errors.push(format!("walk error: {error}"));
                 continue;
             }
@@ -48,6 +49,7 @@ pub fn walk_with_errors(root: &Path, cfg: &WalkConfig) -> Result<(Vec<DirNode>, 
             let metadata = match entry.metadata() {
                 Ok(metadata) => metadata,
                 Err(error) => {
+                    tracing::warn!("metadata error at {}: {error}", path.display());
                     errors.push(format!("metadata error at {}: {error}", path.display()));
                     continue;
                 }
