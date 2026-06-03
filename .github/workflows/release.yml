@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: ddup-linux-x64
+            asset: ddup-linux-x64.tar.gz
+            bin: ddup
+          - os: macos-latest
+            artifact: ddup-macos-x64
+            asset: ddup-macos-x64.tar.gz
+            bin: ddup
+          - os: windows-latest
+            artifact: ddup-windows-x64
+            asset: ddup-windows-x64.zip
+            bin: ddup.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-release-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build --release -p ddup
+      - name: Package Unix
+        if: runner.os != 'Windows'
+        run: |
+          mkdir dist
+          cp target/release/${{ matrix.bin }} dist/${{ matrix.bin }}
+          tar -czf ${{ matrix.artifact }}.tar.gz -C dist ${{ matrix.bin }}
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target\release\${{ matrix.bin }} dist\${{ matrix.bin }}
+          Compress-Archive -Path dist\${{ matrix.bin }} -DestinationPath ${{ matrix.artifact }}.zip -Force
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset }}
