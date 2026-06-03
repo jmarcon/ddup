@@ -186,8 +186,8 @@ fn tree_stats_optional_fields_serialize_as_null() {
 fn sort_config_default() {
     let sort = SortConfig::default();
 
-    assert_eq!(sort.by, SortBy::Name);
-    assert_eq!(sort.order, SortOrder::Asc);
+    assert_eq!(sort.by, SortBy::TotalSize);
+    assert_eq!(sort.order, SortOrder::Desc);
 }
 
 #[test]
@@ -195,12 +195,12 @@ fn sort_config_next_by_cycles() {
     let mut sort = SortConfig::default();
 
     sort.next_by();
-    assert_eq!(sort.by, SortBy::TotalSize);
-    sort.next_by();
     assert_eq!(sort.by, SortBy::FileCount);
     sort.next_by();
     assert_eq!(sort.by, SortBy::Name);
+    sort.next_by();
+    assert_eq!(sort.by, SortBy::TotalSize);
 
     sort.toggle_order();
-    assert_eq!(sort.order, SortOrder::Desc);
+    assert_eq!(sort.order, SortOrder::Asc);
 }

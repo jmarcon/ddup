@@ -44,6 +44,19 @@ fn dir_group(name: &str, size: u64, count: u64) -> DupGroup {
     }
 }
 
+fn dir_group_with_copies(name: &str, size: u64, copies: usize) -> DupGroup {
+    let mut group = dir_group(name, size, 1);
+    group.entries = (0..copies)
+        .map(|index| DupEntry {
+            id: None,
+            path: format!("{name}/{index}").into(),
+            status: EntryStatus::Pending,
+            dir_hash: DirHash::new(format!("hash-{name}")),
+        })
+        .collect();
+    group
+}
+
 fn file_group(name: &str, suppressed: bool) -> DupFileGroup {
     DupFileGroup {
         id: None,
@@ -219,12 +232,18 @@ fn d8_d9_dir_group_and_entries_round_trip() {
 fn d10_d11_d12_dir_sorting() {
     let mut db = Db::memory().unwrap();
     let scan_id = db.upsert_scan(&scan("root", ScanMode::Smart)).unwrap();
-    db.insert_dir_groups(scan_id, &[dir_group("b", 20, 3), dir_group("a", 10, 2)])
-        .unwrap();
+    db.insert_dir_groups(
+        scan_id,
+        &[
+            dir_group_with_copies("b", 20, 2),
+            dir_group_with_copies("a", 10, 5),
+        ],
+    )
+    .unwrap();
 
     assert_eq!(
         db.fetch_dir_groups(scan_id, SortConfig::default()).unwrap()[0].entries[0].path,
-        std::path::PathBuf::from("a/a")
+        std::path::PathBuf::from("a/0")
     );
     assert_eq!(
         db.fetch_dir_groups(
@@ -236,7 +255,7 @@ fn d10_d11_d12_dir_sorting() {
         )
         .unwrap()[0]
             .size_bytes,
-        20
+        10
     );
     assert_eq!(
         db.fetch_dir_groups(
@@ -247,7 +266,8 @@ fn d10_d11_d12_dir_sorting() {
             },
         )
         .unwrap()[0]
-            .file_count,
+            .entries
+            .len(),
         2
     );
 }

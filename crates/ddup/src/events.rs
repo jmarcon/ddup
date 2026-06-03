@@ -30,6 +30,7 @@ pub fn handle_key(app: &mut AppState, key: KeyEvent) {
         KeyCode::Char('d') => app.confirm_delete_selected(),
         KeyCode::Char('m') => app.prompt_move_selected(),
         KeyCode::Char('o') => app.open_selected(),
+        KeyCode::Char('c') => app.copy_selected_path(),
         KeyCode::Char('x') => app.toggle_delete_selected(),
         KeyCode::Char('p') => app.toggle_keep_selected(),
         KeyCode::Char('u') => app.clear_selected_decision(),

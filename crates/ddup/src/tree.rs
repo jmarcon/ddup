@@ -209,8 +209,8 @@ fn sorted_dir_groups(groups: &[DupGroup], sort: SortConfig) -> Vec<&DupGroup> {
             .first()
             .map(|entry| &entry.path)
             .cmp(&b.entries.first().map(|entry| &entry.path)),
-        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
-        SortBy::FileCount => a.file_count.cmp(&b.file_count),
+        SortBy::TotalSize => dir_group_consumed_bytes(a).cmp(&dir_group_consumed_bytes(b)),
+        SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
     });
     if sort.order == SortOrder::Desc {
         groups.reverse();
@@ -226,13 +226,21 @@ fn sorted_file_groups(groups: &[DupFileGroup], sort: SortConfig) -> Vec<&DupFile
             .first()
             .map(|entry| &entry.path)
             .cmp(&b.entries.first().map(|entry| &entry.path)),
-        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
+        SortBy::TotalSize => file_group_consumed_bytes(a).cmp(&file_group_consumed_bytes(b)),
         SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
     });
     if sort.order == SortOrder::Desc {
         groups.reverse();
     }
     groups
+}
+
+fn dir_group_consumed_bytes(group: &DupGroup) -> u64 {
+    group.size_bytes.saturating_mul(group.entries.len() as u64)
+}
+
+fn file_group_consumed_bytes(group: &DupFileGroup) -> u64 {
+    group.size_bytes.saturating_mul(group.entries.len() as u64)
 }
 
 fn relative_label(path: &Path, root: &Path) -> String {
@@ -287,6 +295,8 @@ fn set_expanded_at(
 #[cfg(test)]
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
+
+    use ddup_core::{DirHash, DupEntry, EntryStatus};
 
     use super::*;
 
@@ -356,5 +366,51 @@ mod tests {
         let mut model = model();
         model.move_cursor(1);
         assert_eq!(model.selected().unwrap().label, "child");
+    }
+
+    #[test]
+    fn default_sort_places_highest_consumed_dir_group_first() {
+        let tree = build_tree(
+            ViewMode::DirsDuplicated,
+            &[dir_group("small_many", 10, 5), dir_group("big_few", 30, 2)],
+            &[],
+            SortConfig::default(),
+            Path::new("root"),
+        );
+
+        assert_eq!(tree.roots[0].children[0].path, PathBuf::from("big_few/0"));
+    }
+
+    #[test]
+    fn file_count_sort_uses_group_repetition_count() {
+        let tree = build_tree(
+            ViewMode::DirsDuplicated,
+            &[dir_group("few", 100, 2), dir_group("many", 1, 4)],
+            &[],
+            SortConfig {
+                by: SortBy::FileCount,
+                order: SortOrder::Desc,
+            },
+            Path::new("root"),
+        );
+
+        assert_eq!(tree.roots[0].children[0].path, PathBuf::from("many/0"));
+    }
+
+    fn dir_group(name: &str, size_bytes: u64, copies: usize) -> DupGroup {
+        DupGroup {
+            id: Some(1),
+            dir_hash: DirHash::new(format!("hash-{name}")),
+            file_count: 1,
+            size_bytes,
+            entries: (0..copies)
+                .map(|index| DupEntry {
+                    id: Some(i64::try_from(index + 1).unwrap()),
+                    path: PathBuf::from(format!("{name}/{index}")),
+                    status: EntryStatus::Pending,
+                    dir_hash: DirHash::new(format!("hash-{name}")),
+                })
+                .collect(),
+        }
     }
 }

@@ -307,6 +307,26 @@ impl AppState {
         }
     }
 
+    /// Copies selected entry path to the clipboard.
+    pub fn copy_selected_path(&mut self) {
+        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
+            return;
+        };
+        if path.as_os_str().is_empty() {
+            "Select a file or directory entry first".clone_into(&mut self.status_msg);
+            return;
+        }
+        let text = path.display().to_string();
+        match arboard::Clipboard::new().and_then(|mut clipboard| clipboard.set_text(text.clone())) {
+            Ok(()) => self.status_msg = format!("Copied {text}"),
+            Err(error) => {
+                self.modal = Modal::Error {
+                    message: format!("Could not copy path: {error}"),
+                };
+            }
+        }
+    }
+
     /// Confirms modal delete action.
     pub fn confirm_delete(&mut self, entry_id: i64, file: bool) {
         let result = if file {

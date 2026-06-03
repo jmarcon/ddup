@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 ddup-core = { path = "../ddup-core" }
 anyhow = "1.0.102"
+arboard = "3.6.1"
 clap = { version = "4.5.53", features = ["derive"] }
 crossterm = "0.28.1"
 dirs = "5.0.1"

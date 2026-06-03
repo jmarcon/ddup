@@ -35,6 +35,10 @@ Smart é o default e suprime arquivos duplicados dentro de diretórios já dupli
 
 Flat lista todos os arquivos duplicados, mesmo quando a pasta inteira já é duplicada.
 
+A ordenação padrão mostra primeiro grupos com maior espaço total consumido em disco.
+
+Use `s` para alternar por tamanho, repetição do grupo e nome.
+
 ## TUI
 
 | Tecla | Ação |
@@ -49,6 +53,7 @@ Flat lista todos os arquivos duplicados, mesmo quando a pasta inteira já é dup
 | `d` | Deletar item selecionado com confirmação |
 | `m` | Mover item selecionado |
 | `o` | Abrir no file manager |
+| `c` | Copiar caminho completo |
 | `x/p/u/a` | Marcar delete / keep / limpar / aplicar marcas |
 | `F5` ou `Ctrl+R` | Re-scan |
 | `?` | Help |

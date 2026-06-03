@@ -38,7 +38,7 @@ pub fn render(f: &mut Frame<'_>, app: &AppState) {
 
     f.render_widget(
         Paragraph::new(format!(
-            "{:?} | Root: {} | DB: {} | Sort: {:?} {:?} (s/o)",
+            "{:?} | Root: {} | DB: {} | Sort: {:?} {:?} (s/r)",
             app.view_mode,
             app.scan_root.display(),
             app.db_path.display(),
@@ -290,9 +290,9 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
     let area = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Percentage(25),
-            Constraint::Length(15),
-            Constraint::Percentage(25),
+            Constraint::Percentage(20),
+            Constraint::Length(19),
+            Constraint::Percentage(20),
         ])
         .split(f.area())[1];
     let area = Layout::default()
@@ -307,7 +307,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(8),
-            Constraint::Length(3),
+            Constraint::Length(6),
             Constraint::Length(1),
             Constraint::Length(3),
             Constraint::Length(1),
@@ -359,8 +359,7 @@ fn render_scan_overlay(f: &mut Frame<'_>, app: &AppState) {
         rows[0],
     );
     f.render_widget(
-        Paragraph::new(shorten(&app.scan_detail, 120))
-            .alignment(Alignment::Center)
+        Paragraph::new(current_step_lines(app))
             .style(Style::default().bg(DRACULA_BG).fg(DRACULA_CYAN))
             .block(panel("Current step"))
             .wrap(Wrap { trim: true }),
@@ -429,4 +428,17 @@ fn shorten(value: &str, max_chars: usize) -> String {
     } else {
         shortened
     }
+}
+
+fn current_step_lines(app: &AppState) -> Vec<Line<'static>> {
+    vec![
+        Line::from(Span::styled(
+            app.scan_phase.clone(),
+            Style::default()
+                .fg(DRACULA_GREEN)
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(app.scan_detail.clone()),
+    ]
 }
