@@ -69,6 +69,7 @@ Invoke-Step "create fixtures" {
 Invoke-Step "help exposes e2e flags" {
     $help = (cargo run -q -p ddup -- --help) -join "`n"
     if ($help -notmatch "--no-tui") { throw "missing --no-tui in help" }
+    if ($help -notmatch "--no-icons") { throw "missing --no-icons in help" }
     if ($help -notmatch "--db") { throw "missing --db in help" }
     if ($help -notmatch "--mode") { throw "missing --mode in help" }
 }

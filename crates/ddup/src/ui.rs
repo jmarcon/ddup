@@ -1,6 +1,6 @@
 //! Ratatui rendering.
 
-use std::fs;
+use std::{cmp::Ordering, fs, path::PathBuf};
 
 use ratatui::{
     Frame,
@@ -153,7 +153,8 @@ fn list_label(app: &AppState, node: &TreeNode) -> String {
     } else {
         "   "
     };
-    format!("{decision} {indent}{expand} {}", node.label)
+    let icon = node_icon(app, node);
+    format!("{decision} {indent}{expand} {icon}{}", node.label)
 }
 
 fn selected_details(app: &AppState, node: &TreeNode) -> String {
@@ -203,7 +204,7 @@ fn selected_details(app: &AppState, node: &TreeNode) -> String {
         format!("Path: {path}"),
     ];
     lines.extend(group_copies(app, node));
-    lines.extend(directory_preview(node));
+    lines.extend(directory_preview(app, node));
     lines.join("\n")
 }
 
@@ -249,7 +250,7 @@ fn group_copies(app: &AppState, node: &TreeNode) -> Vec<String> {
     lines
 }
 
-fn directory_preview(node: &TreeNode) -> Vec<String> {
+fn directory_preview(app: &AppState, node: &TreeNode) -> Vec<String> {
     if !matches!(node.kind, NodeKind::DirEntry) || !node.path.is_dir() {
         return Vec::new();
     }
@@ -257,10 +258,57 @@ fn directory_preview(node: &TreeNode) -> Vec<String> {
         return vec!["Content: unable to read directory".to_owned()];
     };
     let mut lines = vec!["Content:".to_owned()];
-    for entry in entries.flatten().take(50) {
-        lines.push(format!("  {}", entry.file_name().to_string_lossy()));
+    let mut entries = entries
+        .flatten()
+        .filter_map(|entry| preview_entry(entry).ok())
+        .collect::<Vec<_>>();
+    entries.sort_by(compare_preview_entries);
+    for entry in entries.into_iter().take(50) {
+        let icon = preview_icon(app, entry.is_dir);
+        lines.push(format!("  {icon}{}", entry.name));
     }
     lines
+}
+
+struct PreviewEntry {
+    name: String,
+    path: PathBuf,
+    is_dir: bool,
+}
+
+fn preview_entry(entry: fs::DirEntry) -> std::io::Result<PreviewEntry> {
+    let file_type = entry.file_type()?;
+    Ok(PreviewEntry {
+        name: entry.file_name().to_string_lossy().to_string(),
+        path: entry.path(),
+        is_dir: file_type.is_dir(),
+    })
+}
+
+fn compare_preview_entries(a: &PreviewEntry, b: &PreviewEntry) -> Ordering {
+    b.is_dir
+        .cmp(&a.is_dir)
+        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        .then_with(|| a.path.cmp(&b.path))
+}
+
+fn node_icon(app: &AppState, node: &TreeNode) -> &'static str {
+    if !app.icons_enabled {
+        return "";
+    }
+    match node.kind {
+        NodeKind::GroupRoot if node.file_count.is_some() && node.expanded => "\u{f115} ",
+        NodeKind::GroupRoot if node.file_count.is_some() => "\u{f07b} ",
+        NodeKind::DirEntry => "\u{f07b} ",
+        NodeKind::GroupRoot | NodeKind::FileEntry | NodeKind::FileLeaf => "\u{f15b} ",
+    }
+}
+
+fn preview_icon(app: &AppState, is_dir: bool) -> &'static str {
+    if !app.icons_enabled {
+        return "";
+    }
+    if is_dir { "\u{f07b} " } else { "\u{f15b} " }
 }
 
 fn format_bytes(bytes: u64) -> String {

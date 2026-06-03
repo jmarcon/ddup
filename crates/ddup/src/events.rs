@@ -24,6 +24,8 @@ pub fn handle_key(app: &mut AppState, key: KeyEvent) {
         KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
         KeyCode::Char('j') | KeyCode::Down => app.tree.move_cursor(1),
         KeyCode::Char('k') | KeyCode::Up => app.tree.move_cursor(-1),
+        KeyCode::PageDown => app.tree.move_cursor(20),
+        KeyCode::PageUp => app.tree.move_cursor(-20),
         KeyCode::Char('h') | KeyCode::Left => app.tree.close_selected(),
         KeyCode::Char('l') | KeyCode::Right => app.tree.open_selected(),
         KeyCode::Enter => app.tree.toggle_expand(),
@@ -52,6 +54,7 @@ pub fn handle_key(app: &mut AppState, key: KeyEvent) {
             app.status_msg = format!("{:?}", app.view_mode);
             app.rebuild_tree();
         }
+        KeyCode::Char('i') => app.toggle_icons(),
         KeyCode::Char('?') => app.modal = Modal::Help,
         _ => {}
     }
@@ -147,7 +150,11 @@ mod tests {
     };
 
     fn app() -> AppState {
-        let base = std::env::temp_dir().join(format!("ddup-events-{}", std::process::id()));
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let base = std::env::temp_dir().join(format!("ddup-events-{}-{nonce}", std::process::id()));
         let _ = std::fs::create_dir_all(&base);
         let args = Args {
             path: base.clone(),
@@ -157,6 +164,7 @@ mod tests {
             no_walk: true,
             exit_after_scan: false,
             no_tui: true,
+            no_icons: false,
         };
         let mut app = AppState::new(&args).unwrap();
         app.tree = TreeModel {
@@ -192,6 +200,21 @@ mod tests {
                     file_count: Some(1),
                     content_hash: Some("hash".to_owned()),
                 },
+                TreeNode {
+                    path: PathBuf::from("c"),
+                    entry_id: Some(3),
+                    label: "c".to_owned(),
+                    depth: 0,
+                    kind: NodeKind::DirEntry,
+                    expanded: false,
+                    children: Vec::new(),
+                    group_id: Some(1),
+                    dup_marker: "pending".to_owned(),
+                    entry_count: 1,
+                    size_bytes: 1,
+                    file_count: Some(1),
+                    content_hash: Some("hash".to_owned()),
+                },
             ],
         };
         app
@@ -208,6 +231,24 @@ mod tests {
         handle_key(&mut app, key(KeyCode::Down));
 
         assert_eq!(app.tree.cursor, 1);
+    }
+
+    #[test]
+    fn page_down_moves_by_page() {
+        let mut app = app();
+
+        handle_key(&mut app, key(KeyCode::PageDown));
+
+        assert_eq!(app.tree.cursor, 2);
+    }
+
+    #[test]
+    fn i_toggles_icons() {
+        let mut app = app();
+
+        handle_key(&mut app, key(KeyCode::Char('i')));
+
+        assert!(!app.icons_enabled);
     }
 
     #[test]

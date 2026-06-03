@@ -65,6 +65,9 @@ pub struct Args {
     /// Run scan without opening the TUI.
     #[arg(long)]
     pub no_tui: bool,
+    /// Disable Nerd Font file and folder icons.
+    #[arg(long)]
+    pub no_icons: bool,
 }
 
 /// CLI scan mode.
@@ -127,6 +130,7 @@ pub enum Modal {
 }
 
 /// Mutable app state.
+#[allow(clippy::struct_excessive_bools)]
 pub struct AppState {
     /// Database.
     pub db: Db,
@@ -176,6 +180,8 @@ pub struct AppState {
     pub scan_errors: Vec<String>,
     /// Re-scan requested by UI.
     pub rescan_requested: bool,
+    /// Whether Nerd Font icons are shown.
+    pub icons_enabled: bool,
 }
 
 impl AppState {
@@ -215,7 +221,18 @@ impl AppState {
             scan_detail: String::new(),
             scan_errors: Vec::new(),
             rescan_requested: false,
+            icons_enabled: !args.no_icons,
         })
+    }
+
+    /// Toggles Nerd Font icons.
+    pub fn toggle_icons(&mut self) {
+        self.icons_enabled = !self.icons_enabled;
+        self.status_msg = if self.icons_enabled {
+            "Icons enabled".to_owned()
+        } else {
+            "Icons disabled".to_owned()
+        };
     }
 
     /// Rebuilds visible tree.

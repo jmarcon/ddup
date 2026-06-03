@@ -16,6 +16,7 @@ cargo install --path crates/ddup
 ddup C:\path\to\scan --mode smart
 ddup C:\path\to\scan --mode flat --rescan
 ddup C:\path\to\scan --db C:\tmp\ddup.sqlite --no-tui
+ddup C:\path\to\scan --no-icons
 ```
 
 Sem `--db`, o SQLite fica em `AppData\Local\ddup\scans.db` no Windows.
@@ -44,6 +45,7 @@ Use `s` para alternar por tamanho, repetição do grupo e nome.
 | Tecla | Ação |
 |---|---|
 | `j/k` ou setas | Navegar |
+| `PgUp/PgDown` | Navegar por página |
 | mouse | Selecionar e rolar |
 | `Enter` | Abrir/fechar grupo |
 | `h/l` | Fechar/abrir grupo |
@@ -54,6 +56,7 @@ Use `s` para alternar por tamanho, repetição do grupo e nome.
 | `m` | Mover item selecionado |
 | `o` | Abrir no file manager |
 | `c` | Copiar caminho completo |
+| `i` | Ativar/desativar ícones Nerd Fonts |
 | `x/p/u/a` | Marcar delete / keep / limpar / aplicar marcas |
 | `F5` ou `Ctrl+R` | Re-scan |
 | `?` | Help |
