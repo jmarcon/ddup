@@ -74,13 +74,19 @@ Invoke-Step "help exposes e2e flags" {
 }
 
 Invoke-Step "default sqlite path persists" {
-    $output = cargo run -q -p ddup -- (Resolve-Path -LiteralPath $Root) --no-tui --mode smart
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    $text = $output -join "`n"
-    if ($text -notmatch "SQLite:\s*(.+)") {
-        throw "missing SQLite path in output"
+    $oldDataLocal = $env:DDUP_DATA_LOCAL_DIR
+    $env:DDUP_DATA_LOCAL_DIR = Join-Path (Resolve-Path -LiteralPath ".") $LocalAppData
+    try {
+        $output = cargo run -q -p ddup -- (Resolve-Path -LiteralPath $Root) --no-tui --mode smart
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        $text = $output -join "`n"
+        if ($text -notmatch "SQLite:\s*(.+)") {
+            throw "missing SQLite path in output"
+        }
+        Assert-SqliteHasScan -Path $Matches[1].Trim()
+    } finally {
+        $env:DDUP_DATA_LOCAL_DIR = $oldDataLocal
     }
-    Assert-SqliteHasScan -Path $Matches[1].Trim()
 }
 
 Invoke-Step "custom sqlite persists" {

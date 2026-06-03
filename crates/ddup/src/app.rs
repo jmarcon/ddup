@@ -1,12 +1,19 @@
 //! Application state.
 
-use std::{collections::HashSet, fs, path::PathBuf};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use ddup_core::{Db, DupFileGroup, DupGroup, Scan, ScanEvent, ScanMode, SortConfig};
+use ddup_core::{
+    Db, DupFileGroup, DupGroup, EntryStatus, Scan, ScanEvent, ScanMode, SortConfig, delete_entry,
+    delete_file_entry, move_entry, move_file_entry, open_in_explorer,
+};
 
-use crate::tree::{TreeModel, build_tree};
+use crate::tree::{NodeKind, TreeModel, build_tree};
 
 /// Scan step.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -259,6 +266,126 @@ impl AppState {
         self.keep_selected.remove(&path);
     }
 
+    /// Opens a delete confirmation for the selected entry.
+    pub fn confirm_delete_selected(&mut self) {
+        let Some((entry_id, file)) = self.selected_action_target() else {
+            "Select a file or directory entry first".clone_into(&mut self.status_msg);
+            return;
+        };
+        self.modal = Modal::ConfirmDelete { entry_id, file };
+    }
+
+    /// Opens a move prompt for the selected entry.
+    pub fn prompt_move_selected(&mut self) {
+        let Some((entry_id, file)) = self.selected_action_target() else {
+            "Select a file or directory entry first".clone_into(&mut self.status_msg);
+            return;
+        };
+        self.modal = Modal::MovePrompt {
+            entry_id,
+            file,
+            input: String::new(),
+        };
+    }
+
+    /// Opens selected entry in the platform file manager.
+    pub fn open_selected(&mut self) {
+        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
+            return;
+        };
+        if path.as_os_str().is_empty() {
+            "Select a file or directory entry first".clone_into(&mut self.status_msg);
+            return;
+        }
+        match open_in_explorer(&path) {
+            Ok(()) => self.status_msg = format!("Opened {}", path.display()),
+            Err(error) => {
+                self.modal = Modal::Error {
+                    message: error.to_string(),
+                }
+            }
+        }
+    }
+
+    /// Confirms modal delete action.
+    pub fn confirm_delete(&mut self, entry_id: i64, file: bool) {
+        let result = if file {
+            delete_file_entry(&self.db, entry_id)
+        } else {
+            delete_entry(&self.db, entry_id)
+        };
+        self.after_action(result, "Deleted");
+    }
+
+    /// Confirms modal move action.
+    pub fn confirm_move(&mut self, entry_id: i64, file: bool, dest: &Path) {
+        let result = if file {
+            move_file_entry(&self.db, entry_id, dest)
+        } else {
+            move_entry(&self.db, entry_id, dest)
+        };
+        self.after_action(result, "Moved");
+    }
+
+    /// Applies all delete/keep marks.
+    pub fn apply_marked_actions(&mut self) {
+        let mut changed = 0_usize;
+        for group in self.dir_groups.clone() {
+            for entry in group.entries {
+                if self.delete_selected.contains(&entry.path) {
+                    if let Some(id) = entry.id {
+                        if let Err(error) = delete_entry(&self.db, id) {
+                            self.modal = Modal::Error {
+                                message: error.to_string(),
+                            };
+                            return;
+                        }
+                        changed += 1;
+                    }
+                } else if self.keep_selected.contains(&entry.path)
+                    && let Some(id) = entry.id
+                {
+                    if let Err(error) = self.db.update_entry_status(id, EntryStatus::Kept) {
+                        self.modal = Modal::Error {
+                            message: error.to_string(),
+                        };
+                        return;
+                    }
+                    changed += 1;
+                }
+            }
+        }
+        for group in self.file_groups.clone() {
+            for entry in group.entries {
+                if self.delete_selected.contains(&entry.path) {
+                    if let Some(id) = entry.id {
+                        if let Err(error) = delete_file_entry(&self.db, id) {
+                            self.modal = Modal::Error {
+                                message: error.to_string(),
+                            };
+                            return;
+                        }
+                        changed += 1;
+                    }
+                } else if self.keep_selected.contains(&entry.path)
+                    && let Some(id) = entry.id
+                {
+                    if let Err(error) = self.db.update_file_entry_status(id, EntryStatus::Kept) {
+                        self.modal = Modal::Error {
+                            message: error.to_string(),
+                        };
+                        return;
+                    }
+                    changed += 1;
+                }
+            }
+        }
+        self.delete_selected.clear();
+        self.keep_selected.clear();
+        self.reload_current_scan();
+        self.status_msg = format!("Applied {changed} marked actions");
+    }
+
     /// Marks scan as started.
     pub fn begin_scan(&mut self) {
         self.scan_running = true;
@@ -391,9 +518,63 @@ impl AppState {
             self.scan_done_steps.push(step);
         }
     }
+
+    fn selected_action_target(&self) -> Option<(i64, bool)> {
+        let node = self.tree.selected()?;
+        let entry_id = node.entry_id?;
+        match node.kind {
+            NodeKind::DirEntry => Some((entry_id, false)),
+            NodeKind::FileEntry | NodeKind::FileLeaf => Some((entry_id, true)),
+            NodeKind::GroupRoot => None,
+        }
+    }
+
+    fn after_action(&mut self, result: ddup_core::Result<()>, label: &str) {
+        match result {
+            Ok(()) => {
+                self.modal = Modal::None;
+                self.reload_current_scan();
+                label.clone_into(&mut self.status_msg);
+            }
+            Err(error) => {
+                self.modal = Modal::Error {
+                    message: error.to_string(),
+                };
+            }
+        }
+    }
+
+    fn reload_current_scan(&mut self) {
+        let Some(scan_id) = self.current_scan.as_ref().and_then(|scan| scan.id) else {
+            self.rebuild_tree();
+            return;
+        };
+        match (
+            self.db.fetch_dir_groups(scan_id, self.sort),
+            self.db.fetch_file_groups(
+                scan_id,
+                self.sort,
+                self.view_mode != ViewMode::FilesDuplicatedFlat,
+            ),
+        ) {
+            (Ok(dir_groups), Ok(file_groups)) => {
+                self.dir_groups = dir_groups;
+                self.file_groups = file_groups;
+                self.rebuild_tree();
+            }
+            (Err(error), _) | (_, Err(error)) => {
+                self.modal = Modal::Error {
+                    message: error.to_string(),
+                };
+            }
+        }
+    }
 }
 
 fn default_db_path() -> PathBuf {
+    if let Some(path) = std::env::var_os("DDUP_DATA_LOCAL_DIR") {
+        return PathBuf::from(path).join("ddup").join("scans.db");
+    }
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
         .join("ddup")

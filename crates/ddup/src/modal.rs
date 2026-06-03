@@ -9,8 +9,9 @@ pub fn modal_text(modal: &Modal) -> Option<String> {
         Modal::None => None,
         Modal::Help => Some(
             "Keys: q quit, Esc close help/quit, j/k or arrows move, mouse click/scroll\n\
-             enter toggle, h close, l open, f view, s sort field, o/r sort order\n\
-             d mark delete, m mark keep, u clear mark, F5/Ctrl+R re-scan, ? help\n\
+             enter toggle, h close, l open group, f view, s sort field, r sort order\n\
+             d delete, m move, o open, x mark delete, p mark keep, u clear mark, a apply marks\n\
+             F5/Ctrl+R re-scan, ? help\n\
              What is Smart mode?\n\
              Smart suppresses duplicate files inside duplicated folders.\n\
              Use Flat when every duplicate file matters."

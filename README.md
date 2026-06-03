@@ -2,12 +2,46 @@
 
 CLI/TUI Rust para detectar diretórios e arquivos duplicados.
 
-## Uso
+## Instalação
 
 ```powershell
 cargo install --path crates/ddup
-ddup C:\path\to\scan --mode smart
 ```
+
+## Uso
+
+```powershell
+ddup C:\path\to\scan --mode smart
+ddup C:\path\to\scan --mode flat --rescan
+ddup C:\path\to\scan --db C:\tmp\ddup.sqlite --no-tui
+```
+
+Sem `--db`, o SQLite fica em `AppData\Local\ddup\scans.db` no Windows.
+
+## Modos
+
+Smart é o default e suprime arquivos duplicados dentro de diretórios já duplicados.
+
+Flat lista todos os arquivos duplicados, mesmo quando a pasta inteira já é duplicada.
+
+## TUI
+
+| Tecla | Ação |
+|---|---|
+| `j/k` ou setas | Navegar |
+| mouse | Selecionar e rolar |
+| `Enter` | Abrir/fechar grupo |
+| `h/l` | Fechar/abrir grupo |
+| `f` | Alternar Dirs / Files Smart / Files Flat |
+| `s` | Alternar campo de sort |
+| `r` | Alternar ordem do sort |
+| `d` | Deletar item selecionado com confirmação |
+| `m` | Mover item selecionado |
+| `o` | Abrir no file manager |
+| `x/p/u/a` | Marcar delete / keep / limpar / aplicar marcas |
+| `F5` ou `Ctrl+R` | Re-scan |
+| `?` | Help |
+| `q` ou `Esc` | Sair |
 
 ## API Rust
 
@@ -21,16 +55,18 @@ println!("{}", result.summary.wasted_bytes);
 
 ## GUI Integration
 
-O core persiste `tree_nodes` em SQLite v2.
+O core persiste `tree_nodes` em SQLite com dados prontos para GUI.
 
 Use `Db::fetch_children` para lazy loading de treemap.
 
 Use `Db::fetch_subtree` para sunburst.
 
-`size_recursive`, `dup_status`, `extension` e `wasted_bytes` já vêm pré-computados.
+`size_recursive`, `dup_status`, `extension`, `wasted_bytes` e `content_hash` já vêm pré-computados.
 
-## Smart Mode
+O core não define cores nem layout; a GUI mapeia `dup_status` e `extension`.
 
-Smart suprime arquivos duplicados dentro de diretórios duplicados.
+## Testes E2E
 
-Flat mostra todos os arquivos duplicados.
+```powershell
+./scripts/run-e2e.ps1
+```

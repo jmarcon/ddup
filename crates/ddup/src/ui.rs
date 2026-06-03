@@ -1,5 +1,7 @@
 //! Ratatui rendering.
 
+use std::fs;
+
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout},
@@ -184,7 +186,7 @@ fn selected_details(app: &AppState, node: &TreeNode) -> String {
         "none"
     };
 
-    [
+    let mut lines = vec![
         format!("Type: {kind}"),
         format!("Group: {group}"),
         format!("Status: {}", node.dup_marker),
@@ -199,8 +201,66 @@ fn selected_details(app: &AppState, node: &TreeNode) -> String {
         format!("Root: {}", app.scan_root.display()),
         format!("Relative: {relative}"),
         format!("Path: {path}"),
-    ]
-    .join("\n")
+    ];
+    lines.extend(group_copies(app, node));
+    lines.extend(directory_preview(node));
+    lines.join("\n")
+}
+
+fn group_copies(app: &AppState, node: &TreeNode) -> Vec<String> {
+    let Some(group_id) = node.group_id else {
+        return Vec::new();
+    };
+    let mut lines = Vec::new();
+    match node.kind {
+        NodeKind::GroupRoot | NodeKind::DirEntry => {
+            if let Some(group) = app
+                .dir_groups
+                .iter()
+                .find(|group| group.id == Some(group_id))
+            {
+                lines.push("Copies:".to_owned());
+                lines.extend(
+                    group
+                        .entries
+                        .iter()
+                        .take(50)
+                        .map(|entry| format!("  [{}] {}", entry.status, entry.path.display())),
+                );
+            }
+        }
+        NodeKind::FileEntry | NodeKind::FileLeaf => {
+            if let Some(group) = app
+                .file_groups
+                .iter()
+                .find(|group| group.id == Some(group_id))
+            {
+                lines.push("Copies:".to_owned());
+                lines.extend(
+                    group
+                        .entries
+                        .iter()
+                        .take(50)
+                        .map(|entry| format!("  [{}] {}", entry.status, entry.path.display())),
+                );
+            }
+        }
+    }
+    lines
+}
+
+fn directory_preview(node: &TreeNode) -> Vec<String> {
+    if !matches!(node.kind, NodeKind::DirEntry) || !node.path.is_dir() {
+        return Vec::new();
+    }
+    let Ok(entries) = fs::read_dir(&node.path) else {
+        return vec!["Content: unable to read directory".to_owned()];
+    };
+    let mut lines = vec!["Content:".to_owned()];
+    for entry in entries.flatten().take(50) {
+        lines.push(format!("  {}", entry.file_name().to_string_lossy()));
+    }
+    lines
 }
 
 fn format_bytes(bytes: u64) -> String {
