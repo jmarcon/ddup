@@ -25,4 +25,7 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
-
+      - run: ./scripts/run-e2e.ps1
+        shell: pwsh
+      - run: cargo doc --no-deps --workspace
+      - run: cargo build --release --workspace

@@ -8,6 +8,7 @@ Prerequisites:
 Commands:
 
 ```powershell
+./scripts/verify-release.ps1
 git push origin main
 git push --force origin v0.1.0
 ```
