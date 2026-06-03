@@ -209,7 +209,7 @@ fn sorted_dir_groups(groups: &[DupGroup], sort: SortConfig) -> Vec<&DupGroup> {
             .first()
             .map(|entry| &entry.path)
             .cmp(&b.entries.first().map(|entry| &entry.path)),
-        SortBy::TotalSize => dir_group_consumed_bytes(a).cmp(&dir_group_consumed_bytes(b)),
+        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
         SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
     });
     if sort.order == SortOrder::Desc {
@@ -226,21 +226,13 @@ fn sorted_file_groups(groups: &[DupFileGroup], sort: SortConfig) -> Vec<&DupFile
             .first()
             .map(|entry| &entry.path)
             .cmp(&b.entries.first().map(|entry| &entry.path)),
-        SortBy::TotalSize => file_group_consumed_bytes(a).cmp(&file_group_consumed_bytes(b)),
+        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
         SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
     });
     if sort.order == SortOrder::Desc {
         groups.reverse();
     }
     groups
-}
-
-fn dir_group_consumed_bytes(group: &DupGroup) -> u64 {
-    group.size_bytes.saturating_mul(group.entries.len() as u64)
-}
-
-fn file_group_consumed_bytes(group: &DupFileGroup) -> u64 {
-    group.size_bytes.saturating_mul(group.entries.len() as u64)
 }
 
 fn relative_label(path: &Path, roots: &[PathBuf]) -> String {
@@ -378,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn default_sort_places_highest_consumed_dir_group_first() {
+    fn default_sort_places_highest_size_dir_group_first() {
         let tree = build_tree(
             ViewMode::DirsDuplicated,
             &[dir_group("small_many", 10, 5), dir_group("big_few", 30, 2)],

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub enum SortBy {
     /// Sort by display name.
     Name,
-    /// Sort by total disk usage for the duplicate group.
+    /// Sort by duplicate item size.
     #[default]
     TotalSize,
     /// Sort by duplicate entry count.

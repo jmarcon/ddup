@@ -503,7 +503,7 @@ fn parse_node_kind(value: &str) -> rusqlite::Result<NodeKind> {
 fn sort_dir_groups(groups: &mut [DupGroup], sort: SortConfig) {
     groups.sort_by(|a, b| match sort.by {
         SortBy::Name => a.entries[0].path.cmp(&b.entries[0].path),
-        SortBy::TotalSize => dir_group_consumed_bytes(a).cmp(&dir_group_consumed_bytes(b)),
+        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
         SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
     });
     if sort.order == SortOrder::Desc {
@@ -514,18 +514,10 @@ fn sort_dir_groups(groups: &mut [DupGroup], sort: SortConfig) {
 fn sort_file_groups(groups: &mut [DupFileGroup], sort: SortConfig) {
     groups.sort_by(|a, b| match sort.by {
         SortBy::Name => a.entries[0].path.cmp(&b.entries[0].path),
-        SortBy::TotalSize => file_group_consumed_bytes(a).cmp(&file_group_consumed_bytes(b)),
+        SortBy::TotalSize => a.size_bytes.cmp(&b.size_bytes),
         SortBy::FileCount => a.entries.len().cmp(&b.entries.len()),
     });
     if sort.order == SortOrder::Desc {
         groups.reverse();
     }
-}
-
-fn dir_group_consumed_bytes(group: &DupGroup) -> u64 {
-    group.size_bytes.saturating_mul(group.entries.len() as u64)
-}
-
-fn file_group_consumed_bytes(group: &DupFileGroup) -> u64 {
-    group.size_bytes.saturating_mul(group.entries.len() as u64)
 }

@@ -243,7 +243,7 @@ fn d10_d11_d12_dir_sorting() {
 
     assert_eq!(
         db.fetch_dir_groups(scan_id, SortConfig::default()).unwrap()[0].entries[0].path,
-        std::path::PathBuf::from("a/0")
+        std::path::PathBuf::from("b/0")
     );
     assert_eq!(
         db.fetch_dir_groups(
@@ -255,7 +255,7 @@ fn d10_d11_d12_dir_sorting() {
         )
         .unwrap()[0]
             .size_bytes,
-        10
+        20
     );
     assert_eq!(
         db.fetch_dir_groups(

@@ -39,7 +39,7 @@ Smart é o default e suprime arquivos duplicados dentro de diretórios já dupli
 
 Flat lista todos os arquivos duplicados, mesmo quando a pasta inteira já é duplicada.
 
-A ordenação padrão mostra primeiro grupos com maior espaço total consumido em disco.
+A ordenação padrão mostra primeiro grupos com maior tamanho por cópia duplicada.
 
 Use `s` para alternar por tamanho, repetição do grupo e nome.
 
