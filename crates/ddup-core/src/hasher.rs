@@ -46,8 +46,12 @@ pub fn hash_file(path: &Path) -> Result<FileHash> {
 pub fn hash_dir(file_hashes: &[FileHash], child_dir_hashes: &[DirHash]) -> DirHash {
     let mut parts = file_hashes
         .iter()
-        .map(FileHash::as_str)
-        .chain(child_dir_hashes.iter().map(DirHash::as_str))
+        .map(|hash| format!("file:{}", hash.as_str()))
+        .chain(
+            child_dir_hashes
+                .iter()
+                .map(|hash| format!("dir:{}", hash.as_str())),
+        )
         .collect::<Vec<_>>();
     parts.sort_unstable();
     let payload = parts.join("\n");

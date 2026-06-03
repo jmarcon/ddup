@@ -12,9 +12,9 @@ use crate::{
 
 pub(crate) fn build_tree_stats(
     nodes: &[DirNode],
-    _file_hashes: &HashMap<PathBuf, FileHash>,
+    file_hashes: &HashMap<PathBuf, FileHash>,
     _file_sizes: &HashMap<PathBuf, u64>,
-    _dir_hashes: &HashMap<PathBuf, DirHash>,
+    dir_hashes: &HashMap<PathBuf, DirHash>,
     dir_metadata: &HashMap<PathBuf, DirMeta>,
     dir_groups: &[DupGroup],
     file_groups: &[DupFileGroup],
@@ -63,6 +63,9 @@ pub(crate) fn build_tree_stats(
             dir_group_id,
             file_group_id: None,
             wasted_bytes: 0,
+            content_hash: dir_hashes
+                .get(&node.path)
+                .map(|value| value.as_str().to_owned()),
         });
 
         for file in &node.files {
@@ -84,6 +87,9 @@ pub(crate) fn build_tree_stats(
                 dir_group_id: None,
                 file_group_id,
                 wasted_bytes: 0,
+                content_hash: file_hashes
+                    .get(&file.path)
+                    .map(|value| value.as_str().to_owned()),
             });
         }
     }

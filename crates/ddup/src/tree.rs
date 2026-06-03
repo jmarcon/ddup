@@ -46,6 +46,8 @@ pub struct TreeNode {
     pub size_bytes: u64,
     /// Recursive file count.
     pub file_count: Option<u64>,
+    /// File or directory hash.
+    pub content_hash: Option<String>,
 }
 
 /// Tree model.
@@ -148,11 +150,13 @@ pub fn build_tree(
                         entry_count: group.entries.len(),
                         size_bytes: group.size_bytes,
                         file_count: Some(group.file_count),
+                        content_hash: Some(entry.dir_hash.as_str().to_owned()),
                     })
                     .collect(),
                 entry_count: group.entries.len(),
                 size_bytes: group.size_bytes,
                 file_count: Some(group.file_count),
+                content_hash: Some(group.dir_hash.as_str().to_owned()),
             })
             .collect(),
         ViewMode::FilesDuplicatedSmart | ViewMode::FilesDuplicatedFlat => {
@@ -183,11 +187,13 @@ pub fn build_tree(
                             entry_count: group.entries.len(),
                             size_bytes: group.size_bytes,
                             file_count: None,
+                            content_hash: Some(group.file_hash.as_str().to_owned()),
                         })
                         .collect(),
                     entry_count: group.entries.len(),
                     size_bytes: group.size_bytes,
                     file_count: None,
+                    content_hash: Some(group.file_hash.as_str().to_owned()),
                 })
                 .collect()
         }
@@ -307,12 +313,14 @@ mod tests {
                     entry_count: 2,
                     size_bytes: 100,
                     file_count: Some(3),
+                    content_hash: Some("child-hash".to_owned()),
                 }],
                 group_id: Some(1),
                 dup_marker: "dir".to_owned(),
                 entry_count: 2,
                 size_bytes: 100,
                 file_count: Some(3),
+                content_hash: Some("root-hash".to_owned()),
             }],
         }
     }

@@ -32,21 +32,26 @@ if not db_path.exists():
 
 conn = sqlite3.connect(db_path)
 scan_count = conn.execute("SELECT COUNT(*) FROM scans").fetchone()[0]
-dir_group_count = conn.execute("SELECT COUNT(*) FROM dup_groups").fetchone()[0]
-file_group_count = conn.execute("SELECT COUNT(*) FROM dup_file_groups").fetchone()[0]
-tree_count = conn.execute("SELECT COUNT(*) FROM tree_nodes").fetchone()[0]
+scan_id = conn.execute("SELECT id FROM scans ORDER BY id DESC LIMIT 1").fetchone()
+if scan_id is None:
+    raise SystemExit("expected at least one scan")
+scan_id = scan_id[0]
+dir_group_count = conn.execute("SELECT COUNT(*) FROM dup_groups WHERE scan_id = ?", (scan_id,)).fetchone()[0]
+file_group_count = conn.execute("SELECT COUNT(*) FROM dup_file_groups WHERE scan_id = ?", (scan_id,)).fetchone()[0]
+tree_count = conn.execute("SELECT COUNT(*) FROM tree_nodes WHERE scan_id = ?", (scan_id,)).fetchone()[0]
+missing_hash_count = conn.execute("SELECT COUNT(*) FROM tree_nodes WHERE scan_id = ? AND content_hash IS NULL", (scan_id,)).fetchone()[0]
 conn.close()
 
-if scan_count < 1:
-    raise SystemExit("expected at least one scan")
 if dir_group_count < 1:
     raise SystemExit("expected duplicate directory groups")
 if file_group_count < 1:
     raise SystemExit("expected duplicate file groups")
 if tree_count < 1:
     raise SystemExit("expected tree nodes")
+if missing_hash_count != 0:
+    raise SystemExit(f"expected every tree node to have content_hash, missing={missing_hash_count}")
 
-print(f"SQLite ok: scans={scan_count}, dir_groups={dir_group_count}, file_groups={file_group_count}, tree_nodes={tree_count}")
+print(f"SQLite ok: scans={scan_count}, dir_groups={dir_group_count}, file_groups={file_group_count}, tree_nodes={tree_count}, missing_hashes={missing_hash_count}")
 '@
 
     python -c $script $Path

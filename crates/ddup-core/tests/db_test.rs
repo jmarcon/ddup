@@ -84,6 +84,7 @@ fn tree(path: &str, parent: Option<&str>, kind: NodeKind, depth: u32, waste: u64
         dir_group_id: None,
         file_group_id: None,
         wasted_bytes: waste,
+        content_hash: Some(format!("hash-{path}")),
     }
 }
 
@@ -108,6 +109,59 @@ fn d3_user_version_zero_migrates() {
     rusqlite::Connection::open(&path).unwrap();
 
     assert!(Db::open(&path).is_ok());
+}
+
+#[test]
+fn d31_v2_database_migrates_content_hash() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("x.db");
+    let conn = rusqlite::Connection::open(&path).unwrap();
+    conn.execute_batch(
+        "
+        PRAGMA user_version = 2;
+        CREATE TABLE scans (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          root_path TEXT NOT NULL UNIQUE,
+          scanned_at TEXT NOT NULL,
+          scan_mode TEXT NOT NULL DEFAULT 'smart',
+          total_dirs INTEGER NOT NULL DEFAULT 0,
+          total_files INTEGER NOT NULL DEFAULT 0,
+          wasted_bytes INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE tree_nodes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          scan_id INTEGER NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
+          path TEXT NOT NULL,
+          parent_path TEXT,
+          kind TEXT NOT NULL,
+          depth INTEGER NOT NULL,
+          size_bytes INTEGER NOT NULL,
+          size_recursive INTEGER NOT NULL,
+          file_count_recursive INTEGER NOT NULL,
+          extension TEXT,
+          dup_status TEXT NOT NULL,
+          dir_group_id INTEGER,
+          file_group_id INTEGER,
+          wasted_bytes INTEGER NOT NULL DEFAULT 0
+        );
+        ",
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = Db::open(&path).unwrap();
+    let scan_id = db.upsert_scan(&scan("root", ScanMode::Smart)).unwrap();
+    let mut db = db;
+    db.insert_tree_nodes(scan_id, &[tree("root", None, NodeKind::Dir, 0, 0)])
+        .unwrap();
+
+    assert_eq!(
+        db.fetch_node(scan_id, "root".as_ref())
+            .unwrap()
+            .unwrap()
+            .content_hash,
+        Some("hash-root".to_owned())
+    );
 }
 
 #[test]

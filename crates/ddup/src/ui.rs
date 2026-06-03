@@ -192,6 +192,10 @@ fn selected_details(app: &AppState, node: &TreeNode) -> String {
         format!("Entries: {}", node.entry_count),
         format!("Size: {}", format_bytes(node.size_bytes)),
         format!("Files: {file_count}"),
+        format!(
+            "Hash: {}",
+            node.content_hash.as_deref().unwrap_or("not available")
+        ),
         format!("Root: {}", app.scan_root.display()),
         format!("Relative: {relative}"),
         format!("Path: {path}"),

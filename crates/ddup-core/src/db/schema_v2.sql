@@ -1,4 +1,4 @@
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 DROP TABLE IF EXISTS tree_nodes;
 DROP TABLE IF EXISTS dup_file_entries;
@@ -62,7 +62,8 @@ CREATE TABLE tree_nodes (
   dup_status            TEXT    NOT NULL,
   dir_group_id          INTEGER REFERENCES dup_groups(id) ON DELETE SET NULL,
   file_group_id         INTEGER REFERENCES dup_file_groups(id) ON DELETE SET NULL,
-  wasted_bytes          INTEGER NOT NULL DEFAULT 0
+  wasted_bytes          INTEGER NOT NULL DEFAULT 0,
+  content_hash          TEXT
 );
 
 CREATE INDEX idx_dup_groups_scan         ON dup_groups(scan_id);
@@ -75,4 +76,3 @@ CREATE INDEX idx_tree_nodes_scan         ON tree_nodes(scan_id);
 CREATE INDEX idx_tree_nodes_parent       ON tree_nodes(scan_id, parent_path);
 CREATE INDEX idx_tree_nodes_dup_status   ON tree_nodes(scan_id, dup_status);
 CREATE INDEX idx_tree_nodes_path         ON tree_nodes(scan_id, path);
-

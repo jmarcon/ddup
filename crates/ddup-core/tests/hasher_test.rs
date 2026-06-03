@@ -95,3 +95,11 @@ fn h9_child_dir_hashes_only_are_defined() {
 
     assert!(!hash.as_str().is_empty());
 }
+
+#[test]
+fn h11_file_and_dir_hash_inputs_are_typed() {
+    assert_ne!(
+        hash_dir(&[FileHash::new("same")], &[]),
+        hash_dir(&[], &[DirHash::new("same")])
+    );
+}

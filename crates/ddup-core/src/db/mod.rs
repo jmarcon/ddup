@@ -10,7 +10,7 @@ use crate::{
     NodeKind, Result, Scan, ScanMode, SortBy, SortConfig, SortOrder, TreeStats,
 };
 
-const SCHEMA_V2: &str = include_str!("schema_v2.sql");
+const SCHEMA: &str = include_str!("schema_v2.sql");
 
 /// SQLite database handle.
 pub struct Db {
@@ -206,8 +206,8 @@ impl Db {
                 "INSERT INTO tree_nodes
                  (scan_id, path, parent_path, kind, depth, size_bytes, size_recursive,
                   file_count_recursive, extension, dup_status, dir_group_id, file_group_id,
-                  wasted_bytes)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                  wasted_bytes, content_hash)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             )?;
             for node in nodes {
                 stmt.execute(params![
@@ -223,7 +223,8 @@ impl Db {
                     node.dup_status.to_string(),
                     node.dir_group_id,
                     node.file_group_id,
-                    node.wasted_bytes
+                    node.wasted_bytes,
+                    node.content_hash
                 ])?;
             }
         }
@@ -237,7 +238,7 @@ impl Db {
             .query_row(
                 "SELECT path, parent_path, kind, depth, size_bytes, size_recursive,
                         file_count_recursive, extension, dup_status, dir_group_id,
-                        file_group_id, wasted_bytes
+                        file_group_id, wasted_bytes, content_hash
                  FROM tree_nodes WHERE scan_id = ?1 AND path = ?2",
                 params![scan_id, path_to_string(path)],
                 row_to_tree,
@@ -251,7 +252,7 @@ impl Db {
         let mut stmt = self.conn.prepare(
             "SELECT path, parent_path, kind, depth, size_bytes, size_recursive,
                     file_count_recursive, extension, dup_status, dir_group_id,
-                    file_group_id, wasted_bytes
+                    file_group_id, wasted_bytes, content_hash
              FROM tree_nodes WHERE scan_id = ?1 AND parent_path = ?2 ORDER BY path",
         )?;
         collect_rows(stmt.query_map(params![scan_id, path_to_string(parent_path)], row_to_tree)?)
@@ -286,7 +287,7 @@ impl Db {
         let mut stmt = self.conn.prepare(
             "SELECT path, parent_path, kind, depth, size_bytes, size_recursive,
                     file_count_recursive, extension, dup_status, dir_group_id,
-                    file_group_id, wasted_bytes
+                    file_group_id, wasted_bytes, content_hash
              FROM tree_nodes WHERE scan_id = ?1 AND path LIKE ?2 ORDER BY path",
         )?;
         let pattern = format!("{}%", path_to_string(root));
@@ -385,7 +386,12 @@ impl Db {
 fn migrate(conn: &Connection) -> Result<()> {
     let version = conn.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))?;
     if version < 2 {
-        conn.execute_batch(SCHEMA_V2)?;
+        conn.execute_batch(SCHEMA)?;
+        return Ok(());
+    }
+    if version < 3 {
+        conn.execute("ALTER TABLE tree_nodes ADD COLUMN content_hash TEXT", [])?;
+        conn.pragma_update(None, "user_version", 3)?;
     }
     Ok(())
 }
@@ -455,6 +461,7 @@ fn row_to_tree(row: &rusqlite::Row<'_>) -> rusqlite::Result<TreeStats> {
         dir_group_id: row.get(9)?,
         file_group_id: row.get(10)?,
         wasted_bytes: row.get(11)?,
+        content_hash: row.get(12)?,
     })
 }
 

@@ -147,6 +147,7 @@ fn tree_stats_round_trip() {
         dir_group_id: None,
         file_group_id: Some(3),
         wasted_bytes: 5,
+        content_hash: Some("file-hash".to_owned()),
     };
 
     let json = serde_json::to_string(&stats).unwrap();
@@ -169,6 +170,7 @@ fn tree_stats_optional_fields_serialize_as_null() {
         dir_group_id: None,
         file_group_id: None,
         wasted_bytes: 0,
+        content_hash: None,
     };
 
     let value = serde_json::to_value(stats).unwrap();
@@ -177,6 +179,7 @@ fn tree_stats_optional_fields_serialize_as_null() {
     assert!(value.get("extension").unwrap().is_null());
     assert!(value.get("dir_group_id").unwrap().is_null());
     assert!(value.get("file_group_id").unwrap().is_null());
+    assert!(value.get("content_hash").unwrap().is_null());
 }
 
 #[test]

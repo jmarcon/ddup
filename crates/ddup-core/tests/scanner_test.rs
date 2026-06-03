@@ -4,7 +4,7 @@ mod common;
 
 use std::sync::mpsc;
 
-use ddup_core::{DupStatus, NodeKind, ScanEvent, ScanMode, WalkConfig, scan};
+use ddup_core::{DirHash, DupStatus, FileHash, NodeKind, ScanEvent, ScanMode, WalkConfig, scan};
 
 use common::build_tree;
 
@@ -298,4 +298,43 @@ fn ts8_parent_path_root_is_none() {
 
     assert_eq!(root.parent_path, None);
     assert_eq!(child.parent_path.as_deref(), Some(dir.path()));
+}
+
+#[test]
+fn ts9_every_tree_node_stores_content_hash() {
+    let dir = build_tree(&[("a/x.txt", Some(b"1")), ("a/y.txt", Some(b"2"))]);
+    let result = scan(dir.path(), &WalkConfig::default(), ScanMode::Smart, None).unwrap();
+
+    assert!(result.tree_stats.iter().all(|node| {
+        node.content_hash
+            .as_deref()
+            .is_some_and(|hash| hash.len() == 64)
+    }));
+}
+
+#[test]
+fn ts10_parent_hash_uses_direct_file_and_direct_child_dir_hashes() {
+    let dir = build_tree(&[("root.txt", Some(b"r")), ("a/x.txt", Some(b"x"))]);
+    let result = scan(dir.path(), &WalkConfig::default(), ScanMode::Smart, None).unwrap();
+    let root = result
+        .tree_stats
+        .iter()
+        .find(|node| node.path == dir.path())
+        .unwrap();
+    let file = result
+        .tree_stats
+        .iter()
+        .find(|node| node.path == dir.path().join("root.txt"))
+        .unwrap();
+    let child_dir = result
+        .tree_stats
+        .iter()
+        .find(|node| node.path == dir.path().join("a"))
+        .unwrap();
+    let expected = ddup_core::hash_dir(
+        &[FileHash::new(file.content_hash.clone().unwrap())],
+        &[DirHash::new(child_dir.content_hash.clone().unwrap())],
+    );
+
+    assert_eq!(root.content_hash.as_deref(), Some(expected.as_str()));
 }

@@ -43,4 +43,6 @@ pub struct TreeStats {
     pub file_group_id: Option<i64>,
     /// Reclaimable bytes.
     pub wasted_bytes: u64,
+    /// File hash for files, directory hash for directories.
+    pub content_hash: Option<String>,
 }
