@@ -157,7 +157,7 @@ mod tests {
         let base = std::env::temp_dir().join(format!("ddup-events-{}-{nonce}", std::process::id()));
         let _ = std::fs::create_dir_all(&base);
         let args = Args {
-            path: base.clone(),
+            paths: vec![base.clone()],
             db: Some(base.join("events.sqlite")),
             mode: CliScanMode::Smart,
             rescan: false,

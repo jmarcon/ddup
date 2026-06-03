@@ -175,9 +175,11 @@ fn selected_details(app: &AppState, node: &TreeNode) -> String {
     } else {
         node.path.display().to_string()
     };
+    let root = matching_root(&node.path, &app.scan_roots)
+        .map_or_else(|| app.scan_root.clone(), PathBuf::from);
     let relative = node
         .path
-        .strip_prefix(&app.scan_root)
+        .strip_prefix(&root)
         .map_or_else(|_| path.clone(), |value| value.display().to_string());
     let decision = if app.delete_selected.contains(&node.path) {
         "delete"
@@ -199,13 +201,21 @@ fn selected_details(app: &AppState, node: &TreeNode) -> String {
             "Hash: {}",
             node.content_hash.as_deref().unwrap_or("not available")
         ),
-        format!("Root: {}", app.scan_root.display()),
+        format!("Root: {}", root.display()),
         format!("Relative: {relative}"),
         format!("Path: {path}"),
     ];
     lines.extend(group_copies(app, node));
     lines.extend(directory_preview(app, node));
     lines.join("\n")
+}
+
+fn matching_root<'a>(path: &std::path::Path, roots: &'a [PathBuf]) -> Option<&'a std::path::Path> {
+    roots
+        .iter()
+        .filter(|root| path.starts_with(root))
+        .max_by_key(|root| root.components().count())
+        .map(PathBuf::as_path)
 }
 
 fn group_copies(app: &AppState, node: &TreeNode) -> Vec<String> {

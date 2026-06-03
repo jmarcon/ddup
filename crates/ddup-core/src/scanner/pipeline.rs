@@ -1,7 +1,7 @@
 //! Scan orchestration.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -39,21 +39,38 @@ pub fn scan(
     mode: ScanMode,
     progress: Option<ProgressTx>,
 ) -> Result<ScanResult> {
-    send_event(
-        progress.as_ref(),
-        ScanEvent::WalkStarted {
-            root: root.to_path_buf(),
-        },
-    );
-    let (nodes, walk_errors) = walk_with_errors(root, cfg)?;
-    for message in walk_errors {
+    scan_roots(&[root.to_path_buf()], cfg, mode, progress)
+}
+
+/// Scans multiple filesystem trees and reports duplicates that appear in at least two roots.
+pub fn scan_roots(
+    roots: &[PathBuf],
+    cfg: &WalkConfig,
+    mode: ScanMode,
+    progress: Option<ProgressTx>,
+) -> Result<ScanResult> {
+    if roots.is_empty() {
+        return Err(crate::CoreError::InvalidState(
+            "at least one scan root is required".to_owned(),
+        ));
+    }
+    let mut nodes = Vec::new();
+    for root in roots {
         send_event(
             progress.as_ref(),
-            ScanEvent::Error {
-                path: None,
-                message,
-            },
+            ScanEvent::WalkStarted { root: root.clone() },
         );
+        let (root_nodes, walk_errors) = walk_with_errors(root, cfg)?;
+        nodes.extend(root_nodes);
+        for message in walk_errors {
+            send_event(
+                progress.as_ref(),
+                ScanEvent::Error {
+                    path: None,
+                    message,
+                },
+            );
+        }
     }
     send_event(
         progress.as_ref(),
@@ -115,7 +132,10 @@ pub fn scan(
         );
     }
 
-    let dir_groups = detect_dir_duplicates(&dir_hashes, &dir_metadata);
+    let mut dir_groups = detect_dir_duplicates(&dir_hashes, &dir_metadata);
+    if roots.len() > 1 {
+        dir_groups = filter_dir_groups_between_roots(dir_groups, roots);
+    }
     send_event(
         progress.as_ref(),
         ScanEvent::DirDupsComputed {
@@ -123,6 +143,9 @@ pub fn scan(
         },
     );
     let mut file_groups = detect_file_duplicates(&file_hashes, &file_sizes);
+    if roots.len() > 1 {
+        file_groups = filter_file_groups_between_roots(file_groups, roots);
+    }
     if mode == ScanMode::Smart {
         apply_smart_suppression(&mut file_groups, &dir_groups);
     }
@@ -141,13 +164,13 @@ pub fn scan(
         &dir_metadata,
         &dir_groups,
         &file_groups,
-        root,
+        roots,
     );
     send_event(progress.as_ref(), ScanEvent::TreeStatsBuilt);
 
     let summary = Scan {
         id: None,
-        root_path: root.to_path_buf(),
+        root_path: scan_root_label(roots),
         scanned_at: Utc::now(),
         scan_mode: mode,
         total_dirs: nodes.len() as u64,
@@ -167,6 +190,61 @@ pub fn scan(
         tree_stats,
         summary,
     })
+}
+
+fn filter_dir_groups_between_roots(groups: Vec<DupGroup>, roots: &[PathBuf]) -> Vec<DupGroup> {
+    let mut groups = groups
+        .into_iter()
+        .filter(|group| spans_multiple_roots(group.entries.iter().map(|entry| &entry.path), roots))
+        .collect::<Vec<_>>();
+    for (index, group) in groups.iter_mut().enumerate() {
+        group.id = i64::try_from(index + 1).ok();
+    }
+    groups
+}
+
+fn filter_file_groups_between_roots(
+    groups: Vec<DupFileGroup>,
+    roots: &[PathBuf],
+) -> Vec<DupFileGroup> {
+    let mut groups = groups
+        .into_iter()
+        .filter(|group| spans_multiple_roots(group.entries.iter().map(|entry| &entry.path), roots))
+        .collect::<Vec<_>>();
+    for (index, group) in groups.iter_mut().enumerate() {
+        group.id = i64::try_from(index + 1).ok();
+    }
+    groups
+}
+
+fn spans_multiple_roots<'a>(paths: impl Iterator<Item = &'a PathBuf>, roots: &[PathBuf]) -> bool {
+    paths
+        .filter_map(|path| root_index(path, roots))
+        .collect::<HashSet<_>>()
+        .len()
+        > 1
+}
+
+fn root_index(path: &Path, roots: &[PathBuf]) -> Option<usize> {
+    roots
+        .iter()
+        .enumerate()
+        .filter(|(_, root)| path.starts_with(root))
+        .max_by_key(|(_, root)| root.components().count())
+        .map(|(index, _)| index)
+}
+
+fn scan_root_label(roots: &[PathBuf]) -> PathBuf {
+    if roots.len() == 1 {
+        return roots[0].clone();
+    }
+    PathBuf::from(
+        roots
+            .iter()
+            .map(|root| root.display().to_string())
+            .collect::<Vec<_>>()
+            .join(" | "),
+    )
 }
 
 fn hash_files_parallel(files: &[FileEntry]) -> Vec<(PathBuf, Result<FileHash>)> {

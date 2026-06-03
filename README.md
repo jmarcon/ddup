@@ -15,11 +15,14 @@ cargo install --path crates/ddup
 ```powershell
 ddup C:\path\to\scan --mode smart
 ddup C:\path\to\scan --mode flat --rescan
+ddup C:\left C:\right --mode smart
 ddup C:\path\to\scan --db C:\tmp\ddup.sqlite --no-tui
 ddup C:\path\to\scan --no-icons
 ```
 
 Sem `--db`, o SQLite fica em `AppData\Local\ddup\scans.db` no Windows.
+
+Com dois ou mais paths, `ddup` compara duplicatas entre roots e ignora duplicatas locais de um único root.
 
 ## Logging
 
@@ -65,10 +68,17 @@ Use `s` para alternar por tamanho, repetição do grupo e nome.
 ## API Rust
 
 ```rust
-use ddup_core::{scan, ScanMode, WalkConfig};
+use ddup_core::{scan, scan_roots, ScanMode, WalkConfig};
 
 let result = scan(".".as_ref(), &WalkConfig::default(), ScanMode::Smart, None)?;
+let compared = scan_roots(
+    &["C:/left".into(), "C:/right".into()],
+    &WalkConfig::default(),
+    ScanMode::Smart,
+    None,
+)?;
 println!("{}", result.summary.wasted_bytes);
+println!("{}", compared.summary.wasted_bytes);
 # Ok::<(), ddup_core::CoreError>(())
 ```
 

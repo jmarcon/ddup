@@ -10,7 +10,7 @@ mod ui;
 
 use std::{
     io::{self, Write},
-    path::Path,
+    path::{Path, PathBuf},
     sync::mpsc,
     thread,
     time::Duration,
@@ -21,11 +21,11 @@ use clap::Parser;
 use crossterm::event::{self, Event, KeyEventKind};
 use ddup_core::{
     Db, DupFileGroup, ProgressTx, ScanEvent, ScanMode, ScanResult, SortConfig, TreeStats,
-    WalkConfig, scan,
+    WalkConfig, scan_roots,
 };
 use tracing_subscriber::EnvFilter;
 
-use crate::app::{AppState, Args, ViewMode};
+use crate::app::{AppState, Args, ViewMode, scan_root_label};
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -35,10 +35,10 @@ fn main() -> Result<()> {
     let (result_tx, result_rx) = mpsc::channel();
 
     if args.no_tui {
-        let root = args.path.clone();
+        let roots = args.paths.clone();
         let db_path = app.db_path.clone();
         let mode = ScanMode::from(args.mode);
-        let result = scan_and_persist(&root, &db_path, mode, progress_tx)?;
+        let result = scan_and_persist(&roots, &db_path, mode, progress_tx)?;
         let mut stdout = io::stdout().lock();
         writeln!(stdout, "SQLite: {}", db_path.display())?;
         writeln!(
@@ -51,8 +51,7 @@ fn main() -> Result<()> {
 
     let mut scan_started = false;
     if !args.rescan {
-        let root = args.path.clone();
-        if load_scan_from_db(&mut app, &root)? {
+        if load_scan_from_db(&mut app, &args.paths)? {
             scan_started = true;
         }
     }
@@ -60,7 +59,7 @@ fn main() -> Result<()> {
     if !args.no_walk && (!scan_started || args.rescan) {
         start_scan(
             &mut app,
-            args.path.clone(),
+            args.paths.clone(),
             ScanMode::from(args.mode),
             progress_tx.clone(),
             result_tx.clone(),
@@ -99,7 +98,7 @@ fn main() -> Result<()> {
             app.rescan_requested = false;
             start_scan(
                 &mut app,
-                args.path.clone(),
+                args.paths.clone(),
                 ScanMode::from(args.mode),
                 progress_tx.clone(),
                 result_tx.clone(),
@@ -137,28 +136,29 @@ fn handle_scan_result(app: &mut AppState, result: Result<ScanResult>) {
 
 fn start_scan(
     app: &mut AppState,
-    root: std::path::PathBuf,
+    roots: Vec<PathBuf>,
     mode: ScanMode,
     progress_tx: ProgressTx,
     result_tx: mpsc::Sender<Result<ScanResult>>,
 ) {
-    app.scan_root.clone_from(&root);
+    app.scan_root = scan_root_label(&roots);
+    app.scan_roots.clone_from(&roots);
     app.begin_scan();
     let db_path = app.db_path.clone();
     thread::spawn(move || {
-        let result = scan_and_persist(&root, &db_path, mode, progress_tx);
+        let result = scan_and_persist(&roots, &db_path, mode, progress_tx);
         let _ = result_tx.send(result);
     });
 }
 
 fn scan_and_persist(
-    root: &Path,
+    roots: &[PathBuf],
     db_path: &Path,
     mode: ScanMode,
     progress_tx: ProgressTx,
 ) -> Result<ScanResult> {
-    let result = scan(
-        root,
+    let result = scan_roots(
+        roots,
         &WalkConfig::default(),
         mode,
         Some(progress_tx.clone()),
@@ -242,8 +242,9 @@ fn remap_tree_group_ids(db: &Db, scan_id: i64, result: &ScanResult) -> Result<Ve
     Ok(tree_stats)
 }
 
-fn load_scan_from_db(app: &mut AppState, root: &Path) -> Result<bool> {
-    let Some(scan) = app.db.fetch_scan(root)? else {
+fn load_scan_from_db(app: &mut AppState, roots: &[PathBuf]) -> Result<bool> {
+    let root = scan_root_label(roots);
+    let Some(scan) = app.db.fetch_scan(&root)? else {
         return Ok(false);
     };
     let Some(scan_id) = scan.id else {
@@ -252,7 +253,8 @@ fn load_scan_from_db(app: &mut AppState, root: &Path) -> Result<bool> {
     app.current_scan = Some(scan);
     app.dir_groups = app.db.fetch_dir_groups(scan_id, app.sort)?;
     app.file_groups = app.db.fetch_file_groups(scan_id, app.sort, false)?;
-    app.scan_root = root.to_path_buf();
+    app.scan_root = root;
+    app.scan_roots = roots.to_vec();
     app.view_mode = ViewMode::DirsDuplicated;
     app.rebuild_tree();
     Ok(true)
@@ -260,6 +262,11 @@ fn load_scan_from_db(app: &mut AppState, root: &Path) -> Result<bool> {
 
 fn apply_scan_result(app: &mut AppState, result: ScanResult) -> Result<()> {
     let root = result.summary.root_path;
-    let _ = load_scan_from_db(app, &root)?;
+    let roots = if app.scan_roots.is_empty() {
+        vec![root]
+    } else {
+        app.scan_roots.clone()
+    };
+    let _ = load_scan_from_db(app, &roots)?;
     Ok(())
 }

@@ -18,7 +18,7 @@ pub(crate) fn build_tree_stats(
     dir_metadata: &HashMap<PathBuf, DirMeta>,
     dir_groups: &[DupGroup],
     file_groups: &[DupFileGroup],
-    root: &Path,
+    roots: &[PathBuf],
 ) -> Vec<TreeStats> {
     let dir_group_by_path = dir_groups
         .iter()
@@ -45,11 +45,11 @@ pub(crate) fn build_tree_stats(
     for node in nodes {
         let dir_group_id = dir_group_by_path.get(&node.path).copied().flatten();
         let meta = dir_metadata.get(&node.path);
-        let node_depth = depth(root, &node.path);
+        let node_depth = depth(roots, &node.path);
         rows.push(TreeStats {
             path: node.path.clone(),
             kind: NodeKind::Dir,
-            parent_path: parent_path(root, &node.path),
+            parent_path: parent_path(roots, &node.path),
             depth: node_depth,
             size_bytes: 0,
             size_recursive: meta.map_or(0, |value| value.size_bytes),
@@ -74,7 +74,7 @@ pub(crate) fn build_tree_stats(
                 path: file.path.clone(),
                 kind: NodeKind::File,
                 parent_path: Some(node.path.clone()),
-                depth: depth(root, &file.path),
+                depth: depth(roots, &file.path),
                 size_bytes: file.size,
                 size_recursive: file.size,
                 file_count_recursive: 1,
@@ -126,16 +126,26 @@ pub(crate) fn build_tree_stats(
     rows
 }
 
-fn depth(root: &Path, path: &Path) -> u32 {
-    path.strip_prefix(root).map_or(0, |relative| {
-        u32::try_from(relative.components().count()).unwrap_or(u32::MAX)
-    })
+fn depth(roots: &[PathBuf], path: &Path) -> u32 {
+    matching_root(path, roots)
+        .and_then(|root| path.strip_prefix(root).ok())
+        .map_or(0, |relative| {
+            u32::try_from(relative.components().count()).unwrap_or(u32::MAX)
+        })
 }
 
-fn parent_path(root: &Path, path: &Path) -> Option<PathBuf> {
-    (path != root)
+fn parent_path(roots: &[PathBuf], path: &Path) -> Option<PathBuf> {
+    (matching_root(path, roots) != Some(path))
         .then(|| path.parent().map(Path::to_path_buf))
         .flatten()
+}
+
+fn matching_root<'a>(path: &Path, roots: &'a [PathBuf]) -> Option<&'a Path> {
+    roots
+        .iter()
+        .filter(|root| path.starts_with(root))
+        .max_by_key(|root| root.components().count())
+        .map(PathBuf::as_path)
 }
 
 fn extension(path: &Path) -> Option<String> {

@@ -45,8 +45,9 @@ pub struct StepProgress {
 #[derive(Clone, Debug, Parser)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Args {
-    /// Path to scan.
-    pub path: PathBuf,
+    /// Paths to scan. With 2+ paths, duplicates are compared between roots.
+    #[arg(required = true, num_args = 1..)]
+    pub paths: Vec<PathBuf>,
     /// SQLite database path.
     #[arg(long)]
     pub db: Option<PathBuf>,
@@ -138,6 +139,8 @@ pub struct AppState {
     pub db_path: PathBuf,
     /// Scan root path.
     pub scan_root: PathBuf,
+    /// Scan root paths.
+    pub scan_roots: Vec<PathBuf>,
     /// Current scan.
     pub current_scan: Option<Scan>,
     /// Current view mode.
@@ -196,7 +199,8 @@ impl AppState {
         Ok(Self {
             db,
             db_path,
-            scan_root: args.path.clone(),
+            scan_root: scan_root_label(&args.paths),
+            scan_roots: args.paths.clone(),
             current_scan: None,
             view_mode: ViewMode::DirsDuplicated,
             dir_groups: Vec::new(),
@@ -206,7 +210,7 @@ impl AppState {
             modal: Modal::None,
             status_msg: "Ready".to_owned(),
             should_quit: false,
-            tree: build_tree(ViewMode::DirsDuplicated, &[], &[], sort, &args.path),
+            tree: build_tree(ViewMode::DirsDuplicated, &[], &[], sort, &args.paths),
             delete_selected: HashSet::new(),
             keep_selected: HashSet::new(),
             scan_running: false,
@@ -242,7 +246,7 @@ impl AppState {
             &self.dir_groups,
             &self.file_groups,
             self.sort,
-            &self.scan_root,
+            &self.scan_roots,
         );
     }
 
@@ -616,4 +620,19 @@ fn default_db_path() -> PathBuf {
         .unwrap_or_else(std::env::temp_dir)
         .join("ddup")
         .join("scans.db")
+}
+
+/// Builds stable scan label used as SQLite key for one or more roots.
+#[must_use]
+pub fn scan_root_label(roots: &[PathBuf]) -> PathBuf {
+    if roots.len() == 1 {
+        return roots[0].clone();
+    }
+    PathBuf::from(
+        roots
+            .iter()
+            .map(|root| root.display().to_string())
+            .collect::<Vec<_>>()
+            .join(" | "),
+    )
 }

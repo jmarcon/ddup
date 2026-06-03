@@ -14,7 +14,7 @@ pub use db::Db;
 pub use error::{CoreError, Result};
 pub use hasher::{hash_dir, hash_file};
 pub use progress::{ProgressTx, ScanEvent};
-pub use scanner::{ScanResult, scan};
+pub use scanner::{ScanResult, scan, scan_roots};
 pub use types::{
     DirHash, DupEntry, DupFileEntry, DupFileGroup, DupGroup, DupStatus, EntryStatus, FileHash,
     NodeKind, Scan, ScanMode, SortBy, SortConfig, SortOrder, TreeStats,

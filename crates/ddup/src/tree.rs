@@ -120,7 +120,7 @@ pub fn build_tree(
     dir_groups: &[DupGroup],
     file_groups: &[DupFileGroup],
     sort: SortConfig,
-    root: &Path,
+    roots: &[PathBuf],
 ) -> TreeModel {
     let roots = match view {
         ViewMode::DirsDuplicated => sorted_dir_groups(dir_groups, sort)
@@ -140,7 +140,7 @@ pub fn build_tree(
                     .map(|entry| TreeNode {
                         path: entry.path.clone(),
                         entry_id: entry.id,
-                        label: relative_label(&entry.path, root),
+                        label: relative_label(&entry.path, roots),
                         depth: 1,
                         kind: NodeKind::DirEntry,
                         expanded: false,
@@ -177,7 +177,7 @@ pub fn build_tree(
                         .map(|entry| TreeNode {
                             path: entry.path.clone(),
                             entry_id: entry.id,
-                            label: relative_label(&entry.path, root),
+                            label: relative_label(&entry.path, roots),
                             depth: 1,
                             kind: NodeKind::FileEntry,
                             expanded: false,
@@ -243,11 +243,20 @@ fn file_group_consumed_bytes(group: &DupFileGroup) -> u64 {
     group.size_bytes.saturating_mul(group.entries.len() as u64)
 }
 
-fn relative_label(path: &Path, root: &Path) -> String {
-    path.strip_prefix(root)
-        .map_or(path, |relative| relative)
+fn relative_label(path: &Path, roots: &[PathBuf]) -> String {
+    matching_root(path, roots)
+        .and_then(|root| path.strip_prefix(root).ok())
+        .unwrap_or(path)
         .display()
         .to_string()
+}
+
+fn matching_root<'a>(path: &Path, roots: &'a [PathBuf]) -> Option<&'a Path> {
+    roots
+        .iter()
+        .filter(|root| path.starts_with(root))
+        .max_by_key(|root| root.components().count())
+        .map(PathBuf::as_path)
 }
 
 fn flatten<'a>(node: &'a TreeNode, out: &mut Vec<&'a TreeNode>) {
@@ -375,7 +384,7 @@ mod tests {
             &[dir_group("small_many", 10, 5), dir_group("big_few", 30, 2)],
             &[],
             SortConfig::default(),
-            Path::new("root"),
+            &[PathBuf::from("root")],
         );
 
         assert_eq!(tree.roots[0].children[0].path, PathBuf::from("big_few/0"));
@@ -391,7 +400,7 @@ mod tests {
                 by: SortBy::FileCount,
                 order: SortOrder::Desc,
             },
-            Path::new("root"),
+            &[PathBuf::from("root")],
         );
 
         assert_eq!(tree.roots[0].children[0].path, PathBuf::from("many/0"));

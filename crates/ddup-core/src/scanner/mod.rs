@@ -5,4 +5,4 @@ mod file_dups;
 mod pipeline;
 mod tree_stats;
 
-pub use pipeline::{ScanResult, scan};
+pub use pipeline::{ScanResult, scan, scan_roots};

@@ -96,6 +96,70 @@ Invoke-Step "custom sqlite persists" {
     Assert-SqliteHasScan -Path (Join-Path (Resolve-Path -LiteralPath ".") $DbPath)
 }
 
+Invoke-Step "multi-root compares between roots" {
+    $base = Join-Path (Resolve-Path -LiteralPath ".") "work/ddup-e2e/multi"
+    $left = Join-Path $base "left"
+    $right = Join-Path $base "right"
+    $multiDb = Join-Path $base "multi.sqlite"
+    New-Item -ItemType Directory -Force -Path (Join-Path $left "cross") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $right "cross") | Out-Null
+    Set-Content -LiteralPath (Join-Path $left "cross/a.txt") -Value "cross" -NoNewline
+    Set-Content -LiteralPath (Join-Path $right "cross/a.txt") -Value "cross" -NoNewline
+    Set-Content -LiteralPath (Join-Path $left "local-a.txt") -Value "local" -NoNewline
+    Set-Content -LiteralPath (Join-Path $left "local-b.txt") -Value "local" -NoNewline
+
+    cargo run -q -p ddup -- $left $right --db $multiDb --no-tui --mode flat
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    $script = @'
+import sqlite3
+import sys
+from pathlib import Path
+
+db_path = Path(sys.argv[1])
+left = str(Path(sys.argv[2]).resolve())
+right = str(Path(sys.argv[3]).resolve())
+
+conn = sqlite3.connect(db_path)
+scan_id = conn.execute("SELECT id FROM scans ORDER BY id DESC LIMIT 1").fetchone()[0]
+rows = conn.execute("""
+SELECT g.id, e.path
+FROM dup_groups g
+JOIN dup_entries e ON e.group_id = g.id
+WHERE g.scan_id = ?
+""", (scan_id,)).fetchall()
+file_rows = conn.execute("""
+SELECT g.id, e.path
+FROM dup_file_groups g
+JOIN dup_file_entries e ON e.group_id = g.id
+WHERE g.scan_id = ?
+""", (scan_id,)).fetchall()
+conn.close()
+
+def spans(rows):
+    groups = {}
+    for group_id, path in rows:
+        groups.setdefault(group_id, []).append(str(Path(path).resolve()))
+    return any(any(p.startswith(left) for p in paths) and any(p.startswith(right) for p in paths) for paths in groups.values())
+
+def local_only(rows):
+    groups = {}
+    for group_id, path in rows:
+        groups.setdefault(group_id, []).append(str(Path(path).resolve()))
+    return any(all(p.startswith(left) for p in paths) for paths in groups.values())
+
+if not spans(rows):
+    raise SystemExit("expected directory group spanning both roots")
+if not spans(file_rows):
+    raise SystemExit("expected file group spanning both roots")
+if local_only(file_rows):
+    raise SystemExit("local-only duplicate file group should be ignored")
+print("Multi-root ok")
+'@
+    python -c $script $multiDb $left $right
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 Invoke-Step "remove duplicate directories" {
     ./scripts/remove-duplicate-dirs.ps1 -Root $Root -DbPath $DbPath
 }

@@ -4,7 +4,9 @@ mod common;
 
 use std::sync::mpsc;
 
-use ddup_core::{DirHash, DupStatus, FileHash, NodeKind, ScanEvent, ScanMode, WalkConfig, scan};
+use ddup_core::{
+    DirHash, DupStatus, FileHash, NodeKind, ScanEvent, ScanMode, WalkConfig, scan, scan_roots,
+};
 
 use common::build_tree;
 
@@ -337,4 +339,82 @@ fn ts10_parent_hash_uses_direct_file_and_direct_child_dir_hashes() {
     );
 
     assert_eq!(root.content_hash.as_deref(), Some(expected.as_str()));
+}
+
+#[test]
+fn mr1_multi_root_reports_duplicate_dirs_only_between_roots() {
+    let left = build_tree(&[
+        ("cross/x.txt", Some(b"same")),
+        ("local_a/y.txt", Some(b"local")),
+        ("local_b/y.txt", Some(b"local")),
+    ]);
+    let right = build_tree(&[("cross/x.txt", Some(b"same"))]);
+
+    let result = scan_roots(
+        &[left.path().to_path_buf(), right.path().to_path_buf()],
+        &WalkConfig::default(),
+        ScanMode::Smart,
+        None,
+    )
+    .unwrap();
+
+    assert!(result.dir_groups.iter().any(|group| {
+        group
+            .entries
+            .iter()
+            .any(|entry| entry.path.starts_with(left.path()))
+            && group
+                .entries
+                .iter()
+                .any(|entry| entry.path.starts_with(right.path()))
+    }));
+    assert!(!result.dir_groups.iter().any(|group| {
+        group
+            .entries
+            .iter()
+            .all(|entry| entry.path.starts_with(left.path()))
+    }));
+}
+
+#[test]
+fn mr2_multi_root_reports_duplicate_files_only_between_roots() {
+    let left = build_tree(&[
+        ("cross.txt", Some(b"same")),
+        ("local_a.txt", Some(b"local")),
+        ("local_b.txt", Some(b"local")),
+    ]);
+    let right = build_tree(&[("cross.txt", Some(b"same"))]);
+
+    let result = scan_roots(
+        &[left.path().to_path_buf(), right.path().to_path_buf()],
+        &WalkConfig::default(),
+        ScanMode::Flat,
+        None,
+    )
+    .unwrap();
+
+    assert!(result.file_groups.iter().any(|group| {
+        group
+            .entries
+            .iter()
+            .any(|entry| entry.path.starts_with(left.path()))
+            && group
+                .entries
+                .iter()
+                .any(|entry| entry.path.starts_with(right.path()))
+    }));
+    assert!(!result.file_groups.iter().any(|group| {
+        group
+            .entries
+            .iter()
+            .all(|entry| entry.path.starts_with(left.path()))
+    }));
+    assert!(
+        result
+            .summary
+            .root_path
+            .display()
+            .to_string()
+            .contains(" | ")
+    );
 }
