@@ -20,7 +20,8 @@ use anyhow::Result;
 use clap::Parser;
 use crossterm::event::{self, Event, KeyEventKind};
 use ddup_core::{
-    Db, ProgressTx, ScanEvent, ScanMode, ScanResult, SortConfig, TreeStats, WalkConfig, scan,
+    Db, DupFileGroup, ProgressTx, ScanEvent, ScanMode, ScanResult, SortConfig, TreeStats,
+    WalkConfig, scan,
 };
 
 use crate::app::{AppState, Args, ViewMode};
@@ -157,10 +158,39 @@ fn persist_scan_result(db_path: &Path, result: &ScanResult) -> Result<()> {
     let mut db = Db::open(db_path)?;
     let scan_id = db.upsert_scan(&result.summary)?;
     db.insert_dir_groups(scan_id, &result.dir_groups)?;
-    db.insert_file_groups(scan_id, &result.file_groups)?;
+    let file_groups = remap_file_suppression_group_ids(&db, scan_id, result)?;
+    db.insert_file_groups(scan_id, &file_groups)?;
     let tree_stats = remap_tree_group_ids(&db, scan_id, result)?;
     db.insert_tree_nodes(scan_id, &tree_stats)?;
     Ok(())
+}
+
+fn remap_file_suppression_group_ids(
+    db: &Db,
+    scan_id: i64,
+    result: &ScanResult,
+) -> Result<Vec<DupFileGroup>> {
+    let db_dir_groups = db.fetch_dir_groups(scan_id, SortConfig::default())?;
+    let mut file_groups = result.file_groups.clone();
+
+    for group in &mut file_groups {
+        for entry in &mut group.entries {
+            entry.suppressed_by_dir_group = entry.suppressed_by_dir_group.and_then(|group_id| {
+                result
+                    .dir_groups
+                    .iter()
+                    .find(|group| group.id == Some(group_id))
+                    .and_then(|group| {
+                        db_dir_groups
+                            .iter()
+                            .find(|db_group| db_group.dir_hash == group.dir_hash)
+                            .and_then(|db_group| db_group.id)
+                    })
+            });
+        }
+    }
+
+    Ok(file_groups)
 }
 
 fn remap_tree_group_ids(db: &Db, scan_id: i64, result: &ScanResult) -> Result<Vec<TreeStats>> {
