@@ -146,15 +146,71 @@ fn list_label(app: &AppState, node: &TreeNode) -> String {
     } else {
         ">"
     };
-    let decision = if app.delete_selected.contains(&node.path) {
-        "[D]"
+    let decision = if node.path.as_os_str().is_empty() {
+        "   "
+    } else if app.delete_selected.contains(&node.path) {
+        "[x]"
     } else if app.keep_selected.contains(&node.path) {
         "[K]"
     } else {
-        "   "
+        "[ ]"
     };
     let icon = node_icon(app, node);
-    format!("{decision} {indent}{expand} {icon}{}", node.label)
+    format!(
+        "{decision} {indent}{expand} {icon}{}{}",
+        node.label,
+        group_mark_summary(app, node)
+    )
+}
+
+fn group_mark_summary(app: &AppState, node: &TreeNode) -> String {
+    if !matches!(node.kind, NodeKind::GroupRoot) {
+        return String::new();
+    }
+    let Some(group_id) = node.group_id else {
+        return String::new();
+    };
+    let paths = match (node.file_count.is_some(), node.kind.clone()) {
+        (true, NodeKind::GroupRoot) => app
+            .dir_groups
+            .iter()
+            .find(|group| group.id == Some(group_id))
+            .map(|group| {
+                group
+                    .entries
+                    .iter()
+                    .map(|entry| &entry.path)
+                    .collect::<Vec<_>>()
+            }),
+        (false, NodeKind::GroupRoot) => app
+            .file_groups
+            .iter()
+            .find(|group| group.id == Some(group_id))
+            .map(|group| {
+                group
+                    .entries
+                    .iter()
+                    .map(|entry| &entry.path)
+                    .collect::<Vec<_>>()
+            }),
+        _ => None,
+    };
+    let Some(paths) = paths else {
+        return String::new();
+    };
+    let delete_count = paths
+        .iter()
+        .filter(|path| app.delete_selected.iter().any(|marked| marked == **path))
+        .count();
+    let keep_count = paths
+        .iter()
+        .filter(|path| app.keep_selected.iter().any(|marked| marked == **path))
+        .count();
+    if delete_count == 0 && keep_count == 0 {
+        String::new()
+    } else {
+        format!(" (delete {delete_count}, keep {keep_count})")
+    }
 }
 
 fn selected_details(app: &AppState, node: &TreeNode) -> String {

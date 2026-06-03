@@ -33,7 +33,7 @@ pub fn handle_key(app: &mut AppState, key: KeyEvent) {
         KeyCode::Char('m') => app.prompt_move_selected(),
         KeyCode::Char('o') => app.open_selected(),
         KeyCode::Char('c') => app.copy_selected_path(),
-        KeyCode::Char('x') => app.toggle_delete_selected(),
+        KeyCode::Char(' ' | 'x') => app.toggle_delete_selected(),
         KeyCode::Char('p') => app.toggle_keep_selected(),
         KeyCode::Char('u') => app.clear_selected_decision(),
         KeyCode::Char('a') => app.apply_marked_actions(),
@@ -290,5 +290,16 @@ mod tests {
 
         handle_key(&mut app, key(KeyCode::Char('u')));
         assert!(app.keep_selected.is_empty());
+    }
+
+    #[test]
+    fn space_toggles_delete_mark() {
+        let mut app = app();
+
+        handle_key(&mut app, key(KeyCode::Char(' ')));
+        assert!(app.delete_selected.contains(&PathBuf::from("a")));
+
+        handle_key(&mut app, key(KeyCode::Char(' ')));
+        assert!(!app.delete_selected.contains(&PathBuf::from("a")));
     }
 }

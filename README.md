@@ -60,7 +60,8 @@ Use `s` para alternar por tamanho, repetição do grupo e nome.
 | `o` | Abrir no file manager |
 | `c` | Copiar caminho completo |
 | `i` | Ativar/desativar ícones Nerd Fonts |
-| `x/p/u/a` | Marcar delete / keep / limpar / aplicar marcas |
+| `Space` ou `x` | Marcar/desmarcar item para delete |
+| `p/u/a` | Marcar keep / limpar marca / aplicar marcas |
 | `F5` ou `Ctrl+R` | Re-scan |
 | `?` | Help |
 | `q` ou `Esc` | Sair |

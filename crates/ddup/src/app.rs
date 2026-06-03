@@ -259,8 +259,11 @@ impl AppState {
             return;
         }
         self.keep_selected.remove(&path);
-        if !self.delete_selected.remove(&path) {
+        if self.delete_selected.remove(&path) {
+            "Delete mark cleared".clone_into(&mut self.status_msg);
+        } else {
             self.delete_selected.insert(path);
+            "Marked for delete".clone_into(&mut self.status_msg);
         }
     }
 
@@ -273,8 +276,11 @@ impl AppState {
             return;
         }
         self.delete_selected.remove(&path);
-        if !self.keep_selected.remove(&path) {
+        if self.keep_selected.remove(&path) {
+            "Keep mark cleared".clone_into(&mut self.status_msg);
+        } else {
             self.keep_selected.insert(path);
+            "Marked to keep".clone_into(&mut self.status_msg);
         }
     }
 
@@ -285,6 +291,7 @@ impl AppState {
         };
         self.delete_selected.remove(&path);
         self.keep_selected.remove(&path);
+        "Mark cleared".clone_into(&mut self.status_msg);
     }
 
     /// Opens a delete confirmation for the selected entry.
