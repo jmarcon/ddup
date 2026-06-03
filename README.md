@@ -2,6 +2,8 @@
 
 CLI/TUI Rust para detectar diretórios e arquivos duplicados.
 
+![ddup TUI](docs/assets/tui-screenshot.svg)
+
 ## Instalação
 
 ```powershell

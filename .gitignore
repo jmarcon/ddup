@@ -1,6 +1,6 @@
 target/
+outputs/
 *.db
 .DS_Store
 .vscode/
 .idea/
-

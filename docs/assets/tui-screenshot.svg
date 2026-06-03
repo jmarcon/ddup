@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="ddup terminal UI screenshot">
+  <rect width="1280" height="720" fill="#282a36"/>
+  <text x="12" y="26" font-family="Consolas, monospace" font-size="18" fill="#bd93f9">DirsDuplicated | SQLite: C:\Users\jm\AppData\Local\ddup\scans.db | Root: D:\Projects</text>
+  <rect x="8" y="38" width="626" height="575" fill="none" stroke="#bd93f9" stroke-width="1.5"/>
+  <rect x="644" y="38" width="628" height="575" fill="none" stroke="#bd93f9" stroke-width="1.5"/>
+  <rect x="8" y="632" width="1264" height="78" fill="none" stroke="#bd93f9" stroke-width="1.5"/>
+  <text x="18" y="48" font-family="Consolas, monospace" font-size="16" fill="#bd93f9">Duplicates</text>
+  <text x="654" y="48" font-family="Consolas, monospace" font-size="16" fill="#bd93f9">Details</text>
+  <text x="18" y="642" font-family="Consolas, monospace" font-size="16" fill="#bd93f9">Scan errors</text>
+  <rect x="14" y="62" width="612" height="24" fill="#44475a"/>
+  <text x="18" y="81" font-family="Consolas, monospace" font-size="17" fill="#8be9fd" font-weight="700">Dir group 1</text>
+  <text x="18" y="108" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">  infrastructure\data_lake</text>
+  <text x="18" y="132" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">  infrastructure\grafana</text>
+  <text x="18" y="156" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">  solagora\api</text>
+  <text x="18" y="180" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">  solagora\workers</text>
+  <text x="18" y="220" font-family="Consolas, monospace" font-size="17" fill="#ff79c6">File group 2</text>
+  <text x="18" y="246" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">  reports\january.csv</text>
+  <text x="18" y="270" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">  archive\january-copy.csv</text>
+  <text x="654" y="78" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">Type: duplicate directory group</text>
+  <text x="654" y="104" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">Status: pending</text>
+  <text x="654" y="130" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">Entries: 4</text>
+  <text x="654" y="156" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">Size: 985 B</text>
+  <text x="654" y="182" font-family="Consolas, monospace" font-size="17" fill="#f8f8f2">Hash: 6a4f9b3d...</text>
+  <text x="18" y="666" font-family="Consolas, monospace" font-size="17" fill="#ffb86c">No scan errors</text>
+  <text x="370" y="695" font-family="Consolas, monospace" font-size="16" fill="#6272a4">j/k navigate | f mode | s sort | x mark delete | p keep | a apply | F5 rescan | ? help</text>
+</svg>
