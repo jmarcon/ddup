@@ -4,6 +4,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($IsWindows -and -not $env:GITHUB_ACTIONS -and -not $env:CARGO_BUILD_TARGET) {
+    $link = Get-Command link.exe -ErrorAction SilentlyContinue
+    $gcc = Get-Command gcc -ErrorAction SilentlyContinue
+    if ($link -and $gcc -and $link.Source -match "\\usr\\bin\\link\.exe$") {
+        $gnuToolchain = "stable-x86_64-pc-windows-gnu"
+        $toolchains = rustup toolchain list 2>$null
+        if ($LASTEXITCODE -eq 0 -and ($toolchains -match $gnuToolchain)) {
+            $env:RUSTUP_TOOLCHAIN = $gnuToolchain
+        }
+        $env:CARGO_BUILD_TARGET = "x86_64-pc-windows-gnu"
+        $env:CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER = "gcc"
+    }
+}
+
 function Invoke-Step {
     param(
         [string]$Name,
