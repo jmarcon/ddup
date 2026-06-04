@@ -252,46 +252,59 @@ impl AppState {
 
     /// Toggles selected path as delete target.
     pub fn toggle_delete_selected(&mut self) {
-        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
-            return;
-        };
-        if path.as_os_str().is_empty() {
+        let paths = self.selected_mark_paths();
+        if paths.is_empty() {
             return;
         }
-        self.keep_selected.remove(&path);
-        if self.delete_selected.remove(&path) {
-            "Delete mark cleared".clone_into(&mut self.status_msg);
+        let all_marked = paths.iter().all(|path| self.delete_selected.contains(path));
+        for path in &paths {
+            self.keep_selected.remove(path);
+            if all_marked {
+                self.delete_selected.remove(path);
+            } else {
+                self.delete_selected.insert(path.clone());
+            }
+        }
+        if all_marked {
+            self.status_msg = format!("Delete mark cleared for {} item(s)", paths.len());
         } else {
-            self.delete_selected.insert(path);
-            "Marked for delete".clone_into(&mut self.status_msg);
+            self.status_msg = format!("Marked {} item(s) for delete", paths.len());
         }
     }
 
     /// Toggles selected path as keep target.
     pub fn toggle_keep_selected(&mut self) {
-        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
-            return;
-        };
-        if path.as_os_str().is_empty() {
+        let paths = self.selected_mark_paths();
+        if paths.is_empty() {
             return;
         }
-        self.delete_selected.remove(&path);
-        if self.keep_selected.remove(&path) {
-            "Keep mark cleared".clone_into(&mut self.status_msg);
+        let all_marked = paths.iter().all(|path| self.keep_selected.contains(path));
+        for path in &paths {
+            self.delete_selected.remove(path);
+            if all_marked {
+                self.keep_selected.remove(path);
+            } else {
+                self.keep_selected.insert(path.clone());
+            }
+        }
+        if all_marked {
+            self.status_msg = format!("Keep mark cleared for {} item(s)", paths.len());
         } else {
-            self.keep_selected.insert(path);
-            "Marked to keep".clone_into(&mut self.status_msg);
+            self.status_msg = format!("Marked {} item(s) to keep", paths.len());
         }
     }
 
     /// Clears selected path decision.
     pub fn clear_selected_decision(&mut self) {
-        let Some(path) = self.tree.selected().map(|node| node.path.clone()) else {
+        let paths = self.selected_mark_paths();
+        if paths.is_empty() {
             return;
-        };
-        self.delete_selected.remove(&path);
-        self.keep_selected.remove(&path);
-        "Mark cleared".clone_into(&mut self.status_msg);
+        }
+        for path in &paths {
+            self.delete_selected.remove(path);
+            self.keep_selected.remove(path);
+        }
+        self.status_msg = format!("Cleared marks for {} item(s)", paths.len());
     }
 
     /// Opens a delete confirmation for the selected entry.
@@ -574,6 +587,44 @@ impl AppState {
             NodeKind::DirEntry => Some((entry_id, false)),
             NodeKind::FileEntry | NodeKind::FileLeaf => Some((entry_id, true)),
             NodeKind::GroupRoot => None,
+        }
+    }
+
+    fn selected_mark_paths(&self) -> Vec<PathBuf> {
+        let Some(node) = self.tree.selected() else {
+            return Vec::new();
+        };
+        if !node.path.as_os_str().is_empty() {
+            return vec![node.path.clone()];
+        }
+        let Some(group_id) = node.group_id else {
+            return Vec::new();
+        };
+        match self.view_mode {
+            ViewMode::DirsDuplicated => self
+                .dir_groups
+                .iter()
+                .find(|group| group.id == Some(group_id))
+                .map(|group| {
+                    group
+                        .entries
+                        .iter()
+                        .map(|entry| entry.path.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            ViewMode::FilesDuplicatedSmart | ViewMode::FilesDuplicatedFlat => self
+                .file_groups
+                .iter()
+                .find(|group| group.id == Some(group_id))
+                .map(|group| {
+                    group
+                        .entries
+                        .iter()
+                        .map(|entry| entry.path.clone())
+                        .collect()
+                })
+                .unwrap_or_default(),
         }
     }
 

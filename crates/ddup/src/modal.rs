@@ -20,6 +20,7 @@ pub fn modal_text(modal: &Modal) -> Option<String> {
              K                   Toggle keep mark [K]\n\
              u or Backspace      Clear mark\n\
              a                   Apply marked delete/keep actions\n\
+             Group row           Applies the mark to every item in the group\n\
              \n\
              Actions\n\
              Delete              Delete selected item now\n\

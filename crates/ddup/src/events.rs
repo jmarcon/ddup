@@ -142,6 +142,7 @@ mod tests {
     use std::path::PathBuf;
 
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use ddup_core::{DirHash, DupEntry, DupGroup, EntryStatus};
 
     use super::*;
     use crate::{
@@ -301,5 +302,55 @@ mod tests {
 
         handle_key(&mut app, key(KeyCode::Char(' ')));
         assert!(!app.delete_selected.contains(&PathBuf::from("a")));
+    }
+
+    #[test]
+    fn group_root_delete_mark_applies_to_all_group_entries() {
+        let mut app = app();
+        app.dir_groups = vec![DupGroup {
+            id: Some(42),
+            dir_hash: DirHash::new("hash"),
+            file_count: 1,
+            size_bytes: 1,
+            entries: vec![
+                DupEntry {
+                    id: Some(1),
+                    path: PathBuf::from("a"),
+                    status: EntryStatus::Pending,
+                    dir_hash: DirHash::new("hash"),
+                },
+                DupEntry {
+                    id: Some(2),
+                    path: PathBuf::from("b"),
+                    status: EntryStatus::Pending,
+                    dir_hash: DirHash::new("hash"),
+                },
+            ],
+        }];
+        app.tree = TreeModel {
+            cursor: 0,
+            roots: vec![TreeNode {
+                path: PathBuf::new(),
+                entry_id: None,
+                label: "Dir group 42".to_owned(),
+                depth: 0,
+                kind: NodeKind::GroupRoot,
+                expanded: false,
+                children: Vec::new(),
+                group_id: Some(42),
+                dup_marker: "dir".to_owned(),
+                entry_count: 2,
+                size_bytes: 1,
+                file_count: Some(1),
+                content_hash: Some("hash".to_owned()),
+            }],
+        };
+
+        handle_key(&mut app, key(KeyCode::Char('d')));
+        assert!(app.delete_selected.contains(&PathBuf::from("a")));
+        assert!(app.delete_selected.contains(&PathBuf::from("b")));
+
+        handle_key(&mut app, key(KeyCode::Char('d')));
+        assert!(app.delete_selected.is_empty());
     }
 }

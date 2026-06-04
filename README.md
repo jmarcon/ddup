@@ -68,6 +68,8 @@ Use `s` para alternar por tamanho, repetição do grupo e nome.
 | `?` | Help |
 | `q` ou `Esc` | Sair |
 
+Quando o cursor está em `Dir group` ou `File group`, a marca é aplicada a todos os itens do grupo.
+
 ## API Rust
 
 ```rust
