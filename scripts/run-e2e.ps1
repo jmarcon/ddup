@@ -71,7 +71,20 @@ Invoke-Step "help exposes e2e flags" {
     if ($help -notmatch "--no-tui") { throw "missing --no-tui in help" }
     if ($help -notmatch "--no-icons") { throw "missing --no-icons in help" }
     if ($help -notmatch "--db") { throw "missing --db in help" }
+    if ($help -notmatch "--memory-db") { throw "missing --memory-db in help" }
     if ($help -notmatch "--mode") { throw "missing --mode in help" }
+}
+
+Invoke-Step "in-memory sqlite does not persist a file" {
+    $output = cargo run -q -p ddup -- (Resolve-Path -LiteralPath $Root) --memory-db --no-tui --mode smart
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    $text = $output -join "`n"
+    if ($text -notmatch "SQLite:\s*:memory:") {
+        throw "missing in-memory SQLite output"
+    }
+    if (Test-Path -LiteralPath ":memory:") {
+        throw "in-memory SQLite created a file"
+    }
 }
 
 Invoke-Step "default sqlite path persists" {

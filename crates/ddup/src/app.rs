@@ -51,6 +51,9 @@ pub struct Args {
     /// SQLite database path.
     #[arg(long)]
     pub db: Option<PathBuf>,
+    /// Use an in-memory SQLite database instead of a database file.
+    #[arg(long, visible_alias = "in-memory-db", conflicts_with = "db")]
+    pub memory_db: bool,
     /// Scan mode.
     #[arg(long, value_enum, default_value_t = CliScanMode::Smart)]
     pub mode: CliScanMode,
@@ -137,6 +140,8 @@ pub struct AppState {
     pub db: Db,
     /// Database path.
     pub db_path: PathBuf,
+    /// Whether database is in-memory.
+    pub db_in_memory: bool,
     /// Scan root path.
     pub scan_root: PathBuf,
     /// Scan root paths.
@@ -190,15 +195,21 @@ pub struct AppState {
 impl AppState {
     /// Builds initial app state.
     pub fn new(args: &Args) -> Result<Self> {
-        let db_path = args.db.clone().unwrap_or_else(default_db_path);
-        if let Some(parent) = db_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let db = Db::open(&db_path)?;
+        let (db_path, db) = if args.memory_db {
+            (PathBuf::from(":memory:"), Db::memory()?)
+        } else {
+            let db_path = args.db.clone().unwrap_or_else(default_db_path);
+            if let Some(parent) = db_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            let db = Db::open(&db_path)?;
+            (db_path, db)
+        };
         let sort = SortConfig::default();
         Ok(Self {
             db,
             db_path,
+            db_in_memory: args.memory_db,
             scan_root: scan_root_label(&args.paths),
             scan_roots: args.paths.clone(),
             current_scan: None,
@@ -693,4 +704,27 @@ pub fn scan_root_label(roots: &[PathBuf]) -> PathBuf {
             .collect::<Vec<_>>()
             .join(" | "),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+
+    use super::*;
+
+    #[test]
+    fn memory_db_flag_uses_in_memory_database() {
+        let args = Args::try_parse_from(["ddup", "root", "--memory-db"]).unwrap();
+        let app = AppState::new(&args).unwrap();
+
+        assert!(app.db_in_memory);
+        assert_eq!(app.db_path, PathBuf::from(":memory:"));
+    }
+
+    #[test]
+    fn memory_db_conflicts_with_db_path() {
+        let result = Args::try_parse_from(["ddup", "root", "--memory-db", "--db", "ddup.sqlite"]);
+
+        assert!(result.is_err());
+    }
 }

@@ -36,11 +36,17 @@ fn main() -> Result<()> {
 
     if args.no_tui {
         let roots = args.paths.clone();
-        let db_path = app.db_path.clone();
         let mode = ScanMode::from(args.mode);
-        let result = scan_and_persist(&roots, &db_path, mode, progress_tx)?;
+        let result = scan_roots(
+            &roots,
+            &WalkConfig::default(),
+            mode,
+            Some(progress_tx.clone()),
+        )?;
+        let _ = progress_tx.send(ScanEvent::PersistStarted);
+        persist_scan_result_to_db(&mut app.db, &result)?;
         let mut stdout = io::stdout().lock();
-        writeln!(stdout, "SQLite: {}", db_path.display())?;
+        writeln!(stdout, "SQLite: {}", app.db_path.display())?;
         writeln!(
             stdout,
             "Scan complete: {} dirs, {} files, {} wasted bytes",
@@ -145,10 +151,30 @@ fn start_scan(
     app.scan_roots.clone_from(&roots);
     app.begin_scan();
     let db_path = app.db_path.clone();
+    let db_in_memory = app.db_in_memory;
     thread::spawn(move || {
-        let result = scan_and_persist(&roots, &db_path, mode, progress_tx);
+        let result = if db_in_memory {
+            scan_without_persist(&roots, mode, progress_tx)
+        } else {
+            scan_and_persist(&roots, &db_path, mode, progress_tx)
+        };
         let _ = result_tx.send(result);
     });
+}
+
+fn scan_without_persist(
+    roots: &[PathBuf],
+    mode: ScanMode,
+    progress_tx: ProgressTx,
+) -> Result<ScanResult> {
+    let result = scan_roots(
+        roots,
+        &WalkConfig::default(),
+        mode,
+        Some(progress_tx.clone()),
+    )?;
+    let _ = progress_tx.send(ScanEvent::PersistStarted);
+    Ok(result)
 }
 
 fn scan_and_persist(
@@ -170,11 +196,15 @@ fn scan_and_persist(
 
 fn persist_scan_result(db_path: &Path, result: &ScanResult) -> Result<()> {
     let mut db = Db::open(db_path)?;
+    persist_scan_result_to_db(&mut db, result)
+}
+
+fn persist_scan_result_to_db(db: &mut Db, result: &ScanResult) -> Result<()> {
     let scan_id = db.upsert_scan(&result.summary)?;
     db.insert_dir_groups(scan_id, &result.dir_groups)?;
-    let file_groups = remap_file_suppression_group_ids(&db, scan_id, result)?;
+    let file_groups = remap_file_suppression_group_ids(db, scan_id, result)?;
     db.insert_file_groups(scan_id, &file_groups)?;
-    let tree_stats = remap_tree_group_ids(&db, scan_id, result)?;
+    let tree_stats = remap_tree_group_ids(db, scan_id, result)?;
     db.insert_tree_nodes(scan_id, &tree_stats)?;
     Ok(())
 }
@@ -261,6 +291,9 @@ fn load_scan_from_db(app: &mut AppState, roots: &[PathBuf]) -> Result<bool> {
 }
 
 fn apply_scan_result(app: &mut AppState, result: ScanResult) -> Result<()> {
+    if app.db_in_memory {
+        persist_scan_result_to_db(&mut app.db, &result)?;
+    }
     let root = result.summary.root_path;
     let roots = if app.scan_roots.is_empty() {
         vec![root]

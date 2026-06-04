@@ -19,10 +19,12 @@ ddup C:\path\to\scan --mode smart
 ddup C:\path\to\scan --mode flat --rescan
 ddup C:\left C:\right --mode smart
 ddup C:\path\to\scan --db C:\tmp\ddup.sqlite --no-tui
+ddup C:\path\to\scan --memory-db
 ddup C:\path\to\scan --no-icons
 ```
 
 Sem `--db`, o SQLite fica em `AppData\Local\ddup\scans.db` no Windows.
+Use `--memory-db` para manter o SQLite apenas em memória durante a execução.
 
 Com dois ou mais paths, `ddup` compara duplicatas entre roots e ignora duplicatas locais de um único root.
 

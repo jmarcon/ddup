@@ -160,6 +160,7 @@ mod tests {
         let args = Args {
             paths: vec![base.clone()],
             db: Some(base.join("events.sqlite")),
+            memory_db: false,
             mode: CliScanMode::Smart,
             rescan: false,
             no_walk: true,
