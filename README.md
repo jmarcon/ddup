@@ -6,19 +6,34 @@ CLI/TUI Rust para encontrar diretórios e arquivos duplicados, comparar múltipl
 
 ## Instalação
 
+### Plataformas Suportadas
+
+- **Windows**: x64 (.zip)
+- **Linux**: x64 (.tar.gz)
+- **macOS**: x64 (.tar.gz)
+
+### Downloads
+
+Os binários compilados estão disponíveis na página de [Releases](https://github.com/jmarcon/ddup/releases).
+
+- **Releases Oficiais**: Versões estáveis (ex: `v0.1.0`).
+- **Latest Build**: Build automático da branch `main` com as últimas alterações (pre-release).
+
+### Instalação Manual
+
 Pré-requisitos:
 
 - Rust stable.
 - PowerShell 7 para scripts E2E.
 - Nerd Fonts opcional, para ícones na TUI.
 
-Instalação local:
+Instalação local via Cargo:
 
 ```powershell
 cargo install --path crates/ddup
 ```
 
-Build release:
+Build manual:
 
 ```powershell
 cargo build --release -p ddup
@@ -220,16 +235,30 @@ O core não define cores nem layout.
 
 ## Testes
 
+A integridade do projeto é garantida por testes unitários, de integração e fluxos E2E.
+
+### Execução Local
+
 ```powershell
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
+# Roda todos os testes da workspace
 cargo test --workspace
-./scripts/run-e2e.ps1
+
+# Validação completa (lint, tests, e2e, doc, build)
 ./scripts/verify-release.ps1
 ```
 
+### CI/CD
+
+Todos os Pull Requests e pushes para `main` passam por validação automática no GitHub Actions em:
+- Ubuntu (Linux)
+- macOS
+- Windows
+
 ## Release
 
-O release é validado por GitHub Actions em Ubuntu, macOS e Windows.
+O processo de release é automatizado:
 
-Mais detalhes: [docs/release.md](docs/release.md).
+1.  **Push para `main`**: Gera automaticamente um **Latest Build** (pre-release) com binários atualizados.
+2.  **Tag `v*`**: Gera uma **Release Oficial** estável.
+
+Mais detalhes técnicos: [docs/release.md](docs/release.md).

@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -61,3 +63,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.asset }}
+          tag_name: ${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+          name: ${{ github.ref_name == 'main' && 'Latest Build' || github.ref_name }}
+          prerelease: ${{ github.ref_name == 'main' }}
+          make_latest: ${{ github.ref_name != 'main' }}
